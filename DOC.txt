@@ -1,0 +1,16 @@
+Arch
+CPU:
+    MAIN_MEMORY:
+        READ(ADDR, LEN, DATA)
+        WRITE
+    CSR_MEMORY:
+        READ
+        WRITE
+    REG:
+        PC
+        X[32]
+    DECODER:
+        DEC_INST -> INST
+    RUN:
+        FETCH_INST -> DEC_INST
+        INST(cpu)
