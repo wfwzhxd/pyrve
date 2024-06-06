@@ -40,7 +40,7 @@ class LittleEndness:
     @staticmethod
     def read32u(mem, address):
         data = mem.read(address, 4)
-        v = data[3]<<24 + data[2]<<16 + data[1]<<8 + data[0]
+        v = data[3]<<24 | data[2]<<16 | data[1]<<8 | data[0]
         return v&0xFFFFFFFF
 
     @staticmethod

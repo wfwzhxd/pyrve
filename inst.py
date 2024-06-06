@@ -40,7 +40,7 @@ class InstFormat:
         return None
     
     def __repr__(self) -> str:
-        return '{}[opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, util.u2s(self.imm, 32))
+        return '{}[opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__.__name__, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, util.u2s(self.imm, 32) if self.imm else None)
 
 
 class Format_R(InstFormat):
@@ -59,7 +59,7 @@ class Format_S(InstFormat):
     def imm(self):
         low = bitcut(self.value, 7, 11)
         high = bitcut(self.value, 25, 31)
-        r = (high<<5)+low
+        r = (high<<5)|low
         return util.msb_extend(r, 12, 32)
 
 class Format_U(InstFormat):
@@ -75,7 +75,7 @@ class Format_B(InstFormat):
     def imm(self):
         low = bitcut(self.value, 8, 11)<<1
         high = bitcut(self.value, 25, 30)<<5
-        r = (bitcut(self.value, 31, 31)<<12) + (bitcut(self.value, 7, 7)<<11) + high + low
+        r = (bitcut(self.value, 31, 31)<<12) | (bitcut(self.value, 7, 7)<<11) | high | low
         return util.msb_extend(r, 12, 32)
 
 class Format_J(InstFormat):
@@ -84,7 +84,7 @@ class Format_J(InstFormat):
     def imm(self):
         low = bitcut(self.value, 21, 30)<<1
         high = bitcut(self.value, 12, 19)<<12
-        r = (bitcut(self.value, 31, 31)<<20) + high + (bitcut(self.value, 20, 20)<<11) + low
+        r = (bitcut(self.value, 31, 31)<<20) | high | (bitcut(self.value, 20, 20)<<11) | low
         return util.msb_extend(r, 20, 32)
 
 
