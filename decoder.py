@@ -1,7 +1,11 @@
-import inst
+
 import util
+import logging
+
+logger = logging.getLogger(__name__)
 
 def decode(inst_value):
+    import inst
     t = inst.InstFormat(inst_value)
     inst_class = None
     if 0b0110011 == t.opcode:   # Base Reg
@@ -95,4 +99,6 @@ def decode(inst_value):
             inst_class = inst.EBREAK
     if not inst_class:
         raise RuntimeError("Undecode inst({})".format(inst_value))
-    return inst_class(inst_value)
+    result = inst_class(inst_value)
+    logger.debug('value:{}, inst:{}'.format(inst_value, result))
+    return result

@@ -1,6 +1,9 @@
 import main_memory
 import decoder
 import util
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CPU:
 
@@ -13,13 +16,14 @@ class CPU:
 
     def run(self, step):
         while(step):
+            step -= 1
+            logger.debug(self.regs)
             cached_pc = self.regs.pc
             inst_value = util.LittleEndness.read32u(self.main_m, self.regs.pc)
             decoded_inst = decoder.decode(inst_value)
             decoded_inst.exec(self)
             if cached_pc == self.regs.pc:
                 self.regs.pc += 4  # IS THIS RIGHT?
-        step -= 1
 
 
 class REGS:
@@ -42,7 +46,7 @@ class REGS:
         return self._pc
     
     @pc.setter
-    def set_pc(self, value):
+    def pc(self, value):
         self._pc = value&CPU.XMASK
 
     def __repr__(self) -> str:
