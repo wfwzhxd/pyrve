@@ -1,4 +1,5 @@
 
+bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
 
 def msb_extend(value, cur_len, dst_len):
     msb = value&(1<<(cur_len-1))
