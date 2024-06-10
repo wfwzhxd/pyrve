@@ -27,6 +27,16 @@ def u2s(value, bit_len):
 class LittleEndness:
 
     @staticmethod
+    def read8u(mem, address):
+        data = mem.read(address, 1)
+        return data[0]&0xFF
+
+    @staticmethod
+    def write8u(mem, address, value):
+        data = bytes([value&0XFF])
+        mem.write(address, data)
+    
+    @staticmethod
     def read16u(mem, address):
         data = mem.read(address, 2)
         v = data[1]<<8 + data[0]
