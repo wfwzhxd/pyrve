@@ -40,7 +40,7 @@ class InstFormat:
         return None
     
     def __repr__(self) -> str:
-        return '{}[opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__.__name__, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, util.u2s(self.imm, 32) if self.imm else None)
+        return '{}[opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__.__name__, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, util.u2s(self.imm, 32) if self.imm != None else None)
 
 
 class Format_R(InstFormat):
@@ -207,54 +207,54 @@ class LB(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = _cpu.main_m.read(address, 1)
+        v = util.LittleEndness.read8u(_cpu, address)
         _cpu.regs.set_x(self.rd, util.msb_extend(v, 8, 32))
 
 class LH(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read16u(_cpu.main_m, address)
+        v = util.LittleEndness.read16u(_cpu, address)
         _cpu.regs.set_x(self.rd, util.msb_extend(v, 16, 32))
 
 class LW(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read32u(_cpu.main_m, address)
+        v = util.LittleEndness.read32u(_cpu, address)
         _cpu.regs.set_x(self.rd, v)
 
 class LBU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = _cpu.main_m.read(address, 1)
+        v = util.LittleEndness.read8u(_cpu, address)
         _cpu.regs.set_x(self.rd, v)
 
 class LHU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read16u(_cpu.main_m, address)
+        v = util.LittleEndness.read16u(_cpu, address)
         _cpu.regs.set_x(self.rd, v)
 
 class SB(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        _cpu.main_m.write(address, bytes([_cpu.regs.get_x(self.rs2)&0xFF]))
+        util.LittleEndness.write8u(_cpu, address, _cpu.regs.get_x(self.rs2))
 
 class SH(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write16u(_cpu.main_m, address, _cpu.regs.get_x(self.rs2)&0XFFFF)
+        util.LittleEndness.write16u(_cpu, address, _cpu.regs.get_x(self.rs2)&0XFFFF)
 
 class SW(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write32u(_cpu.main_m, address, _cpu.regs.get_x(self.rs2))
+        util.LittleEndness.write32u(_cpu, address, _cpu.regs.get_x(self.rs2))
 
 # Branch:
 
