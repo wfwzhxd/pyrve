@@ -76,7 +76,7 @@ class Format_B(InstFormat):
         low = bitcut(self.value, 8, 11)<<1
         high = bitcut(self.value, 25, 30)<<5
         r = (bitcut(self.value, 31, 31)<<12) | (bitcut(self.value, 7, 7)<<11) | high | low
-        return util.msb_extend(r, 12, 32)
+        return util.msb_extend(r, 13, 32)
 
 class Format_J(InstFormat):
 
@@ -85,7 +85,7 @@ class Format_J(InstFormat):
         low = bitcut(self.value, 21, 30)<<1
         high = bitcut(self.value, 12, 19)<<12
         r = (bitcut(self.value, 31, 31)<<20) | high | (bitcut(self.value, 20, 20)<<11) | low
-        return util.msb_extend(r, 20, 32)
+        return util.msb_extend(r, 21, 32)
 
 
 # Base REG:
