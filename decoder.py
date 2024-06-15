@@ -1,9 +1,10 @@
-
+import functools
 import util
 import logging
 
 logger = logging.getLogger(__name__)
 
+@functools.lru_cache(maxsize=2048)
 def decode(inst_value):
     import inst
     t = inst.InstFormat(inst_value)

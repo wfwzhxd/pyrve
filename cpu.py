@@ -17,6 +17,7 @@ class CPU:
         self.regs = REGS()
         self.csr = CSR()
         self.mem = mem
+        self.skip_step = 0
 
     def _go_mtrap(self, mcause):
         # MEPC=PC, MIE = 0, GO MTVEC
@@ -28,30 +29,32 @@ class CPU:
 
     def run(self, step):
         while(step):
+            self.skip_step += 1
             step -= 1
             logger.debug(self.regs)
             logger.debug(self.csr)
-            # handle interrupt
-            
-            if util.get_bit(self.csr.mstatus, MIE_BIT): # MIE ENABLE
-                if util.get_bit(self.csr.mip, MTIME_BIT) and util.get_bit(self.csr.mie, MTIME_BIT): # TIMER
-                    self._go_mtrap(0x80000007)
 
             # exec inst
             cached_pc = self.regs.pc
             inst_value = util.LittleEndness.read32u(self.mem, self.regs.pc)
             decoded_inst = decoder.decode(inst_value)
             decoded_inst.exec(self)
-            
-            # mtime
-            mtime = util.LittleEndness.read64u(self.mem, memory.MTIME_BASE)
-            mtimecmp = util.LittleEndness.read64u(self.mem, memory.MTIMECMP_BASE)
-            util.LittleEndness.write64u(self.mem, memory.MTIME_BASE, mtime+1)
-            mtime_pend = 1 if mtime >= mtimecmp else 0
-            self.csr.mip = util.bit_set(self.csr.mip, MTIME_BIT, mtime_pend)
-
             if cached_pc == self.regs.pc:
                 self.regs.pc += 4  # IS THIS RIGHT?
+
+            if self.skip_step>>10:
+                # mtime
+                mtime = util.LittleEndness.read64u(self.mem, memory.MTIME_BASE) + self.skip_step
+                mtimecmp = util.LittleEndness.read64u(self.mem, memory.MTIMECMP_BASE)
+                util.LittleEndness.write64u(self.mem, memory.MTIME_BASE, mtime)
+                mtime_pend = 1 if mtime >= mtimecmp else 0
+                self.csr.mip = util.bit_set(self.csr.mip, MTIME_BIT, mtime_pend)
+                # handle interrupt
+                if util.get_bit(self.csr.mstatus, MIE_BIT): # MIE ENABLE
+                    if util.get_bit(self.csr.mip, MTIME_BIT) and util.get_bit(self.csr.mie, MTIME_BIT): # TIMER
+                        self._go_mtrap(0x80000007)
+                self.skip_step = 0
+
 
 class REGS:
 
