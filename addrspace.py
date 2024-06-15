@@ -1,4 +1,4 @@
-
+import functools
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ class AddrSpace:
         else:
             self.mem = None
 
+    @functools.lru_cache(maxsize=32*1024)
     def _get_space_for_rw(self, addr):
         if self.contain(addr):
             for sub in self.sub_space:
