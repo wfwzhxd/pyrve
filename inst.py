@@ -207,54 +207,54 @@ class LB(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read8u(_cpu.mem, address)
+        v = util.LittleEndness.read8u(_cpu._addrspace, address)
         _cpu.regs.set_x(self.rd, util.msb_extend(v, 8, 32))
 
 class LH(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read16u(_cpu.mem, address)
+        v = util.LittleEndness.read16u(_cpu._addrspace, address)
         _cpu.regs.set_x(self.rd, util.msb_extend(v, 16, 32))
 
 class LW(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read32u(_cpu.mem, address)
+        v = util.LittleEndness.read32u(_cpu._addrspace, address)
         _cpu.regs.set_x(self.rd, v)
 
 class LBU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read8u(_cpu.mem, address)
+        v = util.LittleEndness.read8u(_cpu._addrspace, address)
         _cpu.regs.set_x(self.rd, v)
 
 class LHU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read16u(_cpu.mem, address)
+        v = util.LittleEndness.read16u(_cpu._addrspace, address)
         _cpu.regs.set_x(self.rd, v)
 
 class SB(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write8u(_cpu.mem, address, _cpu.regs.get_x(self.rs2))
+        util.LittleEndness.write8u(_cpu._addrspace, address, _cpu.regs.get_x(self.rs2))
 
 class SH(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write16u(_cpu.mem, address, _cpu.regs.get_x(self.rs2)&0XFFFF)
+        util.LittleEndness.write16u(_cpu._addrspace, address, _cpu.regs.get_x(self.rs2)&0XFFFF)
 
 class SW(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write32u(_cpu.mem, address, _cpu.regs.get_x(self.rs2))
+        util.LittleEndness.write32u(_cpu._addrspace, address, _cpu.regs.get_x(self.rs2))
 
 # Branch:
 

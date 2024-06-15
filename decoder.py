@@ -13,76 +13,90 @@ def decode(inst_value):
         if 0x0 == t.funct3:
             if 0x0 == t.funct7:
                 inst_class = inst.ADD
-            if 0x20 == t.funct7:
+            elif 0x20 == t.funct7:
                 inst_class = inst.SUB
-        if 0x4 == t.funct3 and 0x0 == t.funct7:
+            else:
+                pass
+        elif 0x4 == t.funct3 and 0x0 == t.funct7:
             inst_class = inst.XOR
-        if 0x6 == t.funct3 and 0x0 == t.funct7:
+        elif 0x6 == t.funct3 and 0x0 == t.funct7:
             inst_class = inst.OR
-        if 0x7 == t.funct3 and 0x0 == t.funct7:
+        elif 0x7 == t.funct3 and 0x0 == t.funct7:
             inst_class = inst.AND
-        if 0x1 == t.funct3 and 0x0 == t.funct7:
+        elif 0x1 == t.funct3 and 0x0 == t.funct7:
             inst_class = inst.SLL
-        if 0x5 == t.funct3:
+        elif 0x5 == t.funct3:
             if 0x0 == t.funct7:
                 inst_class = inst.SRL
-            if 0x20 == t.funct7:
+            elif 0x20 == t.funct7:
                 inst_class = inst.SRA
-        if 0x2 == t.funct3 and 0x0 == t.funct7:
+            else:
+                pass
+        elif 0x2 == t.funct3 and 0x0 == t.funct7:
             inst_class = inst.SLT
-        if 0x3 == t.funct3 and 0x0 == t.funct7:
+        elif 0x3 == t.funct3 and 0x0 == t.funct7:
             inst_class = inst.SLTU
+        else:
+            pass
     elif 0b0010011 == t.opcode:  # Base Imm
         t = inst.Format_I(inst_value)
         if 0x0 == t.funct3:
             inst_class = inst.ADDI
-        if 0x4 == t.funct3:
+        elif 0x4 == t.funct3:
             inst_class = inst.XORI
-        if 0x6 == t.funct3:
+        elif 0x6 == t.funct3:
             inst_class = inst.ORI
-        if 0x7 == t.funct3:
+        elif 0x7 == t.funct3:
             inst_class = inst.ANDI
-        if 0x1 == t.funct3 and 0x0 == util.bitcut(t.imm, 5, 11):
+        elif 0x1 == t.funct3 and 0x0 == util.bitcut(t.imm, 5, 11):
             inst_class = inst.SLLI
-        if 0x5 == t.funct3 and 0x0 == util.bitcut(t.imm, 5, 11):
+        elif 0x5 == t.funct3 and 0x0 == util.bitcut(t.imm, 5, 11):
             inst_class = inst.SRLI
-        if 0x5 == t.funct3 and 0x20 == util.bitcut(t.imm, 5, 11):
+        elif 0x5 == t.funct3 and 0x20 == util.bitcut(t.imm, 5, 11):
             inst_class = inst.SRAI
-        if 0x2 == t.funct3:
+        elif 0x2 == t.funct3:
             inst_class = inst.SLTI
-        if 0x3 == t.funct3:
+        elif 0x3 == t.funct3:
             inst_class = inst.SLTIU
+        else:
+            pass
     elif 0b0000011 == t.opcode: # Load
         if 0x0 == t.funct3:
             inst_class = inst.LB
-        if 0x1 == t.funct3:
+        elif 0x1 == t.funct3:
             inst_class = inst.LH
-        if 0x2 == t.funct3:
+        elif 0x2 == t.funct3:
             inst_class = inst.LW
-        if 0x4 == t.funct3:
+        elif 0x4 == t.funct3:
             inst_class = inst.LBU
-        if 0x5 == t.funct3:
+        elif 0x5 == t.funct3:
             inst_class = inst.LHU
+        else:
+            pass
     elif 0b0100011 == t.opcode: # Store
         if 0x0 == t.funct3:
             inst_class = inst.SB
-        if 0x1 == t.funct3:
+        elif 0x1 == t.funct3:
             inst_class = inst.SH
-        if 0x2 == t.funct3:
+        elif 0x2 == t.funct3:
             inst_class = inst.SW
+        else:
+            pass
     elif 0b1100011 == t.opcode: # Branch
         if 0x0 == t.funct3:
             inst_class = inst.BEQ
-        if 0x1 == t.funct3:
+        elif 0x1 == t.funct3:
             inst_class = inst.BNE
-        if 0x4 == t.funct3:
+        elif 0x4 == t.funct3:
             inst_class = inst.BLT
-        if 0x5 == t.funct3:
+        elif 0x5 == t.funct3:
             inst_class = inst.BGE
-        if 0x6 == t.funct3:
+        elif 0x6 == t.funct3:
             inst_class = inst.BLTU
-        if 0x7 == t.funct3:
+        elif 0x7 == t.funct3:
             inst_class = inst.BGEU
+        else:
+            pass
     elif 0b1101111 == t.opcode: # Jal
         inst_class = inst.JAL
     elif 0b1100111 == t.opcode: # Jalr
@@ -96,23 +110,25 @@ def decode(inst_value):
         t = inst.Format_UI(inst_value)
         if 0x0 == t.funct3 and 0x0 == t.imm:
             inst_class = inst.ECALL
-        if 0x0 == t.funct3 and 0x1 == t.imm:
+        elif 0x0 == t.funct3 and 0x1 == t.imm:
             inst_class = inst.EBREAK
-        if 0x302 == t.imm:
+        elif 0x302 == t.imm:
             inst_class = inst.MRET
         # CSR
-        if 0x1 == t.funct3:
+        elif 0x1 == t.funct3:
             inst_class = inst.CSRRW
-        if 0x2 == t.funct3:
+        elif 0x2 == t.funct3:
             inst_class = inst.CSRRS
-        if 0x3 == t.funct3:
+        elif 0x3 == t.funct3:
             inst_class = inst.CSRRC
-        if 0x5 == t.funct3:
+        elif 0x5 == t.funct3:
             inst_class = inst.CSRRWI
-        if 0x6 == t.funct3:
+        elif 0x6 == t.funct3:
             inst_class = inst.CSRRSI
-        if 0x7 == t.funct3:
+        elif 0x7 == t.funct3:
             inst_class = inst.CSRRCI
+        else:
+            pass
     if not inst_class:
         raise RuntimeError("Undecode inst({})".format(inst_value))
     result = inst_class(inst_value)

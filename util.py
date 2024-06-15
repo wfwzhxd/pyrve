@@ -1,3 +1,4 @@
+import struct
 
 bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
 
@@ -38,7 +39,7 @@ def u2s(value, bit_len):
         return -result
     else:   # >=0
         return value
-    
+
 class LittleEndness:
 
     @staticmethod
@@ -53,33 +54,24 @@ class LittleEndness:
     
     @staticmethod
     def read16u(mem, address):
-        data = mem.read(address, 2)
-        v = data[1]<<8 + data[0]
-        return v&0xFFFF
+        return struct.unpack("<H", mem.read(address, 2))[0]
     
     @staticmethod
     def write16u(mem, address, value):
-        data = bytes([value&0XFF, (value>>8)&0XFF])
-        mem.write(address, data)
+        mem.write(address, struct.pack("<H", value&0xFFFF))
     
     @staticmethod
     def read32u(mem, address):
-        data = mem.read(address, 4)
-        v = data[3]<<24 | data[2]<<16 | data[1]<<8 | data[0]
-        return v&0xFFFFFFFF
+        return struct.unpack("<L", mem.read(address, 4))[0]
 
     @staticmethod
     def write32u(mem, address, value):
-        data = bytes([value&0XFF, (value>>8)&0XFF, (value>>16)&0XFF, (value>>24)&0XFF])
-        mem.write(address, data)
+        mem.write(address, struct.pack("<L", value&0xFFFFFFFF))
 
     @staticmethod
     def read64u(mem, address):
-        lv = LittleEndness.read32u(mem, address)
-        hv = LittleEndness.read32u(mem, address+4)
-        return (hv<<32 | lv) & 0xFFFFFFFFFFFFFFFF
+        return struct.unpack("<Q", mem.read(address, 8))[0]
 
     @staticmethod
     def write64u(mem, address, value):
-        LittleEndness.write32u(mem, address, value&0xFFFFFFFF)
-        LittleEndness.write32u(mem, address+4, (value>>32)&0xFFFFFFFF)
+        mem.write(address, struct.pack("<Q", value&0xFFFFFFFFFFFFFFFF))

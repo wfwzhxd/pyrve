@@ -1,3 +1,4 @@
+import addrspace
 import memory
 import decoder
 import util
@@ -13,10 +14,10 @@ class CPU:
     XLEN = 32
     XMASK = 0xFFFFFFFF
 
-    def __init__(self, mem:memory.Memory) -> None:
+    def __init__(self, _addrspace:addrspace.AddrSpace) -> None:
         self.regs = REGS()
         self.csr = CSR()
-        self.mem = mem
+        self._addrspace = _addrspace
         self.skip_step = 0
 
     def _go_mtrap(self, mcause):
@@ -36,7 +37,7 @@ class CPU:
 
             # exec inst
             cached_pc = self.regs.pc
-            inst_value = util.LittleEndness.read32u(self.mem, self.regs.pc)
+            inst_value = util.LittleEndness.read32u(self._addrspace, self.regs.pc)
             decoded_inst = decoder.decode(inst_value)
             decoded_inst.exec(self)
             if cached_pc == self.regs.pc:
@@ -44,9 +45,9 @@ class CPU:
 
             if self.skip_step>>10:
                 # mtime
-                mtime = util.LittleEndness.read64u(self.mem, memory.MTIME_BASE) + self.skip_step
-                mtimecmp = util.LittleEndness.read64u(self.mem, memory.MTIMECMP_BASE)
-                util.LittleEndness.write64u(self.mem, memory.MTIME_BASE, mtime)
+                mtime = util.LittleEndness.read64u(self._addrspace, memory.MTIME_BASE) + self.skip_step
+                mtimecmp = util.LittleEndness.read64u(self._addrspace, memory.MTIMECMP_BASE)
+                util.LittleEndness.write64u(self._addrspace, memory.MTIME_BASE, mtime)
                 mtime_pend = 1 if mtime >= mtimecmp else 0
                 self.csr.mip = util.bit_set(self.csr.mip, MTIME_BIT, mtime_pend)
                 # handle interrupt

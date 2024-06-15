@@ -13,9 +13,9 @@ def main():
     binname = 'RTOSDemo.bin'
     with open(binname, 'rb') as f:
         code = f.read()
-    mem = memory.Memory(100*1024*1024)
-    mem.write(0x80000000, code)
-    _cpu = cpu.CPU(mem)
+    _addrspace = memory.Memory()
+    _addrspace.write(0x80000000, code)
+    _cpu = cpu.CPU(_addrspace)
     _cpu.regs.pc = 0x80000000
     import IPython
     IPython.embed()

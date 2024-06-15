@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class UART(addrspace.AddrSpace):
+class UART(addrspace.ByteAddrSpace):
 
     def __init__(self) -> None:
         super().__init__(0x10000000, 0x10000007, 'uart', False)
