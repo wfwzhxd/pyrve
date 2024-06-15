@@ -207,54 +207,54 @@ class LB(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read8u(_cpu, address)
+        v = util.LittleEndness.read8u(_cpu.mem, address)
         _cpu.regs.set_x(self.rd, util.msb_extend(v, 8, 32))
 
 class LH(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read16u(_cpu, address)
+        v = util.LittleEndness.read16u(_cpu.mem, address)
         _cpu.regs.set_x(self.rd, util.msb_extend(v, 16, 32))
 
 class LW(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read32u(_cpu, address)
+        v = util.LittleEndness.read32u(_cpu.mem, address)
         _cpu.regs.set_x(self.rd, v)
 
 class LBU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read8u(_cpu, address)
+        v = util.LittleEndness.read8u(_cpu.mem, address)
         _cpu.regs.set_x(self.rd, v)
 
 class LHU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read16u(_cpu, address)
+        v = util.LittleEndness.read16u(_cpu.mem, address)
         _cpu.regs.set_x(self.rd, v)
 
 class SB(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write8u(_cpu, address, _cpu.regs.get_x(self.rs2))
+        util.LittleEndness.write8u(_cpu.mem, address, _cpu.regs.get_x(self.rs2))
 
 class SH(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write16u(_cpu, address, _cpu.regs.get_x(self.rs2)&0XFFFF)
+        util.LittleEndness.write16u(_cpu.mem, address, _cpu.regs.get_x(self.rs2)&0XFFFF)
 
 class SW(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
         address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write32u(_cpu, address, _cpu.regs.get_x(self.rs2))
+        util.LittleEndness.write32u(_cpu.mem, address, _cpu.regs.get_x(self.rs2))
 
 # Branch:
 
@@ -324,8 +324,74 @@ class AUIPC(Format_U):
 
 # Environment
 
-class ECALL(Format_I):
+class Format_UI(Format_I):
+
+    @property
+    def imm(self):
+        return super().imm & 0xFFF
+
+class ECALL(Format_UI):
+    
+    def exec(self, _cpu: cpu.CPU):
+        _cpu._go_mtrap(0x0000000B)
+
+class EBREAK(Format_UI):
     pass
 
-class EBREAK(Format_I):
-    pass
+class MRET(Format_UI):
+    
+    def exec(self, _cpu: cpu.CPU):
+        _cpu.regs.pc = _cpu.csr.mepc
+        _cpu.csr.mstatus = util.set_bit(_cpu.csr.mstatus, cpu.MIE_BIT)
+
+# CSR
+
+class CSRRW(Format_UI):
+    
+    def exec(self, _cpu: cpu.CPU):
+        if self.rd:
+            _cpu.regs.set_x(self.rd, _cpu.csr.read(self.imm))
+        _cpu.csr.write(self.imm, _cpu.regs.get_x(self.rs1))
+
+class CSRRS(Format_UI):
+
+    def exec(self, _cpu: cpu.CPU):
+        old_csr = _cpu.csr.read(self.imm)
+        _cpu.regs.set_x(self.rd, old_csr)
+        new_v = _cpu.regs.get_x(self.rs1)
+        if new_v:
+            _cpu.csr.write(self.imm, old_csr|new_v)
+
+class CSRRC(Format_UI):
+    
+    def exec(self, _cpu: cpu.CPU):
+        old_csr = _cpu.csr.read(self.imm)
+        _cpu.regs.set_x(self.rd, old_csr)
+        new_v = _cpu.regs.get_x(self.rs1)
+        if new_v:
+            _cpu.csr.write(self.imm, old_csr&~new_v)
+
+class CSRRWI(Format_UI):
+    
+    def exec(self, _cpu: cpu.CPU):
+        if self.rd:
+            _cpu.regs.set_x(self.rd, _cpu.csr.read(self.imm))
+        _cpu.csr.write(self.imm, self.rs1)
+
+class CSRRSI(Format_UI):
+    
+    def exec(self, _cpu: cpu.CPU):
+        old_csr = _cpu.csr.read(self.imm)
+        _cpu.regs.set_x(self.rd, old_csr)
+        new_v = self.rs1
+        if new_v:
+            _cpu.csr.write(self.imm, old_csr|new_v)
+
+class CSRRCI(Format_UI):
+    
+    def exec(self, _cpu: cpu.CPU):
+        old_csr = _cpu.csr.read(self.imm)
+        _cpu.regs.set_x(self.rd, old_csr)
+        new_v = self.rs1
+        if new_v:
+            _cpu.csr.write(self.imm, old_csr&~new_v)

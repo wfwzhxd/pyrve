@@ -91,12 +91,27 @@ def decode(inst_value):
         inst_class = inst.LUI
     elif 0b0010111 == t.opcode: # Auipc
         inst_class = inst.AUIPC
-    elif 0b1110011 == t.opcode: # Environment
-        t = inst.Format_I(inst_value)
+    elif 0b1110011 == t.opcode: # System
+        t = inst.Format_UI(inst_value)
         if 0x0 == t.funct3 and 0x0 == t.imm:
             inst_class = inst.ECALL
         if 0x0 == t.funct3 and 0x1 == t.imm:
             inst_class = inst.EBREAK
+        if 0x302 == t.imm:
+            inst_class = inst.MRET
+        # CSR
+        if 0x1 == t.funct3:
+            inst_class = inst.CSRRW
+        if 0x2 == t.funct3:
+            inst_class = inst.CSRRS
+        if 0x3 == t.funct3:
+            inst_class = inst.CSRRC
+        if 0x5 == t.funct3:
+            inst_class = inst.CSRRWI
+        if 0x6 == t.funct3:
+            inst_class = inst.CSRRSI
+        if 0x7 == t.funct3:
+            inst_class = inst.CSRRCI
     if not inst_class:
         raise RuntimeError("Undecode inst({})".format(inst_value))
     result = inst_class(inst_value)

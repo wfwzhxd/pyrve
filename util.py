@@ -1,6 +1,21 @@
 
 bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
 
+def get_bit(value, bit):
+    return value & (1<<bit)
+
+def clear_bit(value, bit):
+    return value & ~(1<<bit)
+
+def set_bit(value, bit):
+    return value | (1<<bit)
+
+def bit_set(value, bit, bitv):
+    if bitv:
+        return set_bit(value, bit)
+    else:
+        return clear_bit(value, bit)
+
 def msb_extend(value, cur_len, dst_len):
     msb = value&(1<<(cur_len-1))
     if msb:
@@ -57,3 +72,14 @@ class LittleEndness:
     def write32u(mem, address, value):
         data = bytes([value&0XFF, (value>>8)&0XFF, (value>>16)&0XFF, (value>>24)&0XFF])
         mem.write(address, data)
+
+    @staticmethod
+    def read64u(mem, address):
+        lv = LittleEndness.read32u(mem, address)
+        hv = LittleEndness.read32u(mem, address+4)
+        return (hv<<32 | lv) & 0xFFFFFFFFFFFFFFFF
+
+    @staticmethod
+    def write64u(mem, address, value):
+        LittleEndness.write32u(mem, address, value&0xFFFFFFFF)
+        LittleEndness.write32u(mem, address+4, (value>>32)&0xFFFFFFFF)

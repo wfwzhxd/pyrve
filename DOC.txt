@@ -1,3 +1,7 @@
+2024.06.15
+1235 inst/s with debug log
+11303 inst/s without log
+
 Arch
 CPU:
     MAIN_MEMORY:

@@ -1,30 +1,21 @@
+import addrspace
 import sys
 import logging
 
 logger = logging.getLogger(__name__)
 
-class Peripheral:
-    '''
-    0xc0001000     uart read
-    0xc0002000     uart write
-    '''
+class UART(addrspace.AddrSpace):
 
     def __init__(self) -> None:
+        super().__init__(0x10000000, 0x10000007, 'uart', False)
         self.uart_in_buf = bytearray()
 
-    def read(self, address, length):
-        logger.debug('read {} at {}'.format(length, address))
-        if 0xc0001000 == address:
-            while len(self.uart_in_buf) < length:
-                self.uart_in_buf.extend(sys.stdin.readline().encode('ascii'))
-            result, self.uart_in_buf = self.uart_in_buf[:length], self.uart_in_buf[length:]
-            logger.debug(result.hex())
-            return result
-        raise IndexError('address {}'.format(address))
+    def read_byte(self, addr):
+        # if 0xc0001000 == addr:
+        #     return ord(sys.stdin.read(1))&0xFF
+        return 0xFF
 
-    def write(self, address, data:bytes):
-        logger.debug('write {} at {}'.format(len(data), address))
-        logger.debug(data.hex())        
-        if 0xc0002000 == address:
-            sys.stdout.write(data.decode(encoding='ascii'))
+    def write_byte(self, addr, value):
+        if 0x10000000 == addr:
+            sys.stdout.write(chr(value))
             sys.stdout.flush()
