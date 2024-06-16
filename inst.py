@@ -306,8 +306,9 @@ class JAL(Format_J):
 class JALR(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
+        rs1 = _cpu.regs.get_x(self.rs1)
         _cpu.regs.set_x(self.rd, _cpu.regs.pc+4)
-        _cpu.regs.pc = _cpu.regs.get_x(self.rs1) + self.imm
+        _cpu.regs.pc = rs1 + self.imm
 
 
 # Upper IMM:
