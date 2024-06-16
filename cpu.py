@@ -3,6 +3,7 @@ import memory
 import decoder
 import util
 import logging
+import functools
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,13 @@ class CPU:
         self.csr.mstatus = util.clear_bit(self.csr.mstatus, MIE_BIT)
         self.regs.pc = self.csr.mtvec&0xFFFFFFFC  # Only Direct Mode
 
+    @functools.cache
+    def _read_inst_value(self, pc):
+        '''
+            ASSERT TEXT CODE IS READONLY
+        '''
+        return util.LittleEndness.read32u(self._addrspace, pc)
+
     def run(self, step):
         while(step):
             self.skip_step += 1
@@ -37,8 +45,7 @@ class CPU:
 
             # exec inst
             cached_pc = self.regs.pc
-            inst_value = util.LittleEndness.read32u(self._addrspace, self.regs.pc)
-            decoded_inst = decoder.decode(inst_value)
+            decoded_inst = decoder.decode(self._read_inst_value(self.regs.pc))
             decoded_inst.exec(self)
             if cached_pc == self.regs.pc:
                 self.regs.pc += 4  # IS THIS RIGHT?
