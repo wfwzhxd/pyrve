@@ -2,8 +2,8 @@ import addrspace
 import peripheral
 
 PHYMEM_BASE = 0x80000000
-MTIME_BASE = 0x0200bff8
-MTIMECMP_BASE = 0x02004000
+MTIME_BASE = 0x11000000 + 0xbff8
+MTIMECMP_BASE = 0x11000000 + 0x4000
 
 class Memory(addrspace.BufferAddrSpace):
     

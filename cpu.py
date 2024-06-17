@@ -106,6 +106,10 @@ class CSR:
     }
 
     def __init__(self) -> None:
+        self.just_hold = [0]*4096
+        self.just_hold[0xf11] = 0xff0ff0ff  #mvendorid
+        #self.just_hold[0x301] = 0x40401101  #misa (XLEN=32, IMA+X) // should be 0×4080 1101
+        self.just_hold[0x301] = 0x40000100  #misa (XLEN=32, I)
         self.mstatus = 0
         self.mie = 0
         self.mtvec = 0
@@ -116,11 +120,16 @@ class CSR:
 
     def read(self, addr):
         name = CSR.ADDR_MAP.get(addr)
-        return getattr(self, name)
+        return getattr(self, name) if name else self.just_hold[addr]
 
     def write(self, addr, value):
         name = CSR.ADDR_MAP.get(addr)
-        setattr(self, name, value)
+        if name:
+            setattr(self, name, value)
+        else:
+            self.just_hold[addr] = value
 
     def __repr__(self) -> str:
-        return "CSR({})".format(self.__dict__)
+        d = dict(self.__dict__)
+        del d['just_hold']
+        return "CSR({})".format(d)

@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 class UART(addrspace.ByteAddrSpace):
 
     def __init__(self) -> None:
-        super().__init__(0x10000000, 0x10000007, 'uart', False)
+        super().__init__(0x10000000, 0x10000100, 'uart', False)
         self.uart_in_buf = bytearray()
 
     def read_byte(self, addr):

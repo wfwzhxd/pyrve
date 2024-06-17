@@ -1,3 +1,4 @@
+import collections
 import functools
 import logging
 
@@ -18,6 +19,7 @@ class AddrSpace:
             self.mem = bytearray(end-start+1)
         else:
             self.mem = None
+        self.reserve = collections.defaultdict(set)
 
     def contain(self, addr):
         return addr >= self.start and addr <= self.end

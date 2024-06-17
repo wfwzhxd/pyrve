@@ -396,3 +396,144 @@ class CSRRCI(Format_UI):
         new_v = self.rs1
         if new_v:
             _cpu.csr.write(self.imm, old_csr&~new_v)
+
+
+class FENCE(Format_I):
+
+    def exec(self, _cpu: cpu.CPU):
+        pass
+
+
+# ATOMIC
+
+class FORMAT_ATOMIC(Format_R):
+
+    @property
+    def aq(self):
+        return util.get_bit(self.value, 26)
+    
+    @property
+    def rl(self):
+        return util.get_bit(self.value, 25)
+    
+    @property
+    def funct5(self):
+        return bitcut(self.value, 27, 31)
+
+
+class LRw(FORMAT_ATOMIC):
+
+    def exec(self, _cpu: cpu.CPU):
+        rs1 = _cpu.regs.get_x(self.rs1)
+        mem_rs1 = util.LittleEndness.read32u(_cpu._addrspace, rs1)
+        _cpu.regs.set_x(self.rd, mem_rs1)
+        _cpu._addrspace.reserve[_cpu].add(rs1)
+
+
+class SCw(FORMAT_ATOMIC):
+
+    def exec(self, _cpu: cpu.CPU):
+        rs1 = _cpu.regs.get_x(self.rs1)
+        rs2 = _cpu.regs.get_x(self.rs2)
+        if rs1 in _cpu._addrspace.reserve[_cpu]:
+            util.LittleEndness.write32u(_cpu._addrspace, rs1, rs2)
+            _cpu.regs.set_x(self.rd, 0)
+        else:
+            _cpu.regs.set_x(self.rd, 1)
+        _cpu._addrspace.reserve[_cpu].clear()
+
+
+class FORMAT_AMO(FORMAT_ATOMIC):
+
+    def exec(self, _cpu: cpu.CPU):
+        # load
+        rs1 = _cpu.regs.get_x(self.rs1)
+        _cpu.regs.set_x(self.rd, util.LittleEndness.read32u(_cpu._addrspace, rs1))
+        # op
+        self.do_amo_op(_cpu)
+        # store
+        util.LittleEndness.write32u(_cpu._addrspace, rs1, _cpu.regs.get_x(self.rd))
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        raise NotImplementedError()
+
+
+class AMOSWAPw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        _cpu.regs.set_x(self.rd, rs2)
+        _cpu.regs.set_x(self.rs2, rd)
+
+
+class AMOADDw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        value = rd + rs2
+        _cpu.regs.set_x(self.rd, value)
+
+
+class AMOANDw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        value = rd & rs2
+        _cpu.regs.set_x(self.rd, value)
+
+
+class AMOORw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        value = rd | rs2
+        _cpu.regs.set_x(self.rd, value)
+
+
+class AMOXORw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        value = rd ^ rs2
+        _cpu.regs.set_x(self.rd, value)
+
+
+class AMOMAXw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        value = max(util.u2s(rs2, 32), util.u2s(rd, 32))
+        _cpu.regs.set_x(self.rd, value)
+
+
+class AMOMINw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        value = min(util.u2s(rs2, 32), util.u2s(rd, 32))
+        _cpu.regs.set_x(self.rd, value)
+
+
+class AMOMAXUw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        value = max(rs2, rd)
+        _cpu.regs.set_x(self.rd, value)
+
+
+class AMOMINUw(FORMAT_AMO):
+
+    def do_amo_op(self, _cpu: cpu.CPU):
+        rs2 = _cpu.regs.get_x(self.rs2)
+        rd = _cpu.regs.get_x(self.rd)
+        value = min(rs2, rd)
+        _cpu.regs.set_x(self.rd, value)

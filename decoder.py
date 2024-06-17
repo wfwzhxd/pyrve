@@ -129,6 +129,35 @@ def decode(inst_value):
             inst_class = inst.CSRRCI
         else:
             pass
+    elif 0b0001111 == t.opcode: # Fence
+        inst_class = inst.FENCE
+    if 0b0101111 == t.opcode:   # Atomic
+        t = inst.FORMAT_ATOMIC(inst_value)
+        if 0x2 == t.funct3:
+            if 0x02 == t.funct5:
+                inst_class = inst.LRw
+            elif 0x03 == t.funct5:
+                inst_class = inst.SCw
+            elif 0x01 == t.funct5:
+                inst_class = inst.AMOSWAPw
+            elif 0x00 == t.funct5:
+                inst_class = inst.AMOADDw
+            elif 0x0C == t.funct5:
+                inst_class = inst.AMOANDw
+            elif 0x08 == t.funct5:
+                inst_class = inst.AMOORw
+            elif 0x04 == t.funct5:
+                inst_class = inst.AMOXORw
+            elif 0x14 == t.funct5:
+                inst_class = inst.AMOMAXw
+            elif 0x10 == t.funct5:
+                inst_class = inst.AMOMINw
+            elif 0x18 == t.funct5:
+                inst_class = inst.AMOMINUw
+            elif 0x1C == t.funct5:
+                inst_class = inst.AMOMAXUw
+            else:
+                pass
     if not inst_class:
         raise RuntimeError("Undecode inst({})".format(inst_value))
     result = inst_class(inst_value)
