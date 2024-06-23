@@ -1,3 +1,4 @@
+from typing import Any
 import addrspace
 import memory
 import decoder
@@ -26,7 +27,7 @@ class CPU:
         logger.debug("go_mtrap, mcause: {}".format(hex(mcause)))
         self.csr.mcause = mcause
         self.csr.mepc = self.regs.pc
-        self.csr.mstatus = util.clear_bit(self.csr.mstatus, MIE_BIT)
+        self.csr.mstatus &= ~(1<<MIE_BIT)
         self.regs.pc = self.csr.mtvec&0xFFFFFFFC  # Only Direct Mode
 
     @functools.cache
@@ -34,14 +35,14 @@ class CPU:
         '''
             ASSERT TEXT CODE IS READONLY
         '''
-        return util.LittleEndness.read32u(self._addrspace, pc)
+        return self._addrspace.u32[pc]
 
     def run(self, step):
         while(step):
             self.skip_step += 1
             step -= 1
             logger.debug(self.regs)
-            logger.debug(self.csr)
+            # logger.debug(self.csr)
 
             # exec inst
             cached_pc = self.regs.pc
@@ -52,10 +53,8 @@ class CPU:
 
             if self.skip_step>>10:
                 # mtime
-                mtime = util.LittleEndness.read64u(self._addrspace, memory.MTIME_BASE) + self.skip_step
-                mtimecmp = util.LittleEndness.read64u(self._addrspace, memory.MTIMECMP_BASE)
-                util.LittleEndness.write64u(self._addrspace, memory.MTIME_BASE, mtime)
-                mtime_pend = 1 if mtime >= mtimecmp else 0
+                self._addrspace.u64[memory.MTIME_BASE] += self.skip_step
+                mtime_pend = 1 if self._addrspace.u64[memory.MTIME_BASE] >= self._addrspace.u64[memory.MTIMECMP_BASE] else 0
                 self.csr.mip = util.bit_set(self.csr.mip, MTIME_BIT, mtime_pend)
                 # handle interrupt
                 if util.get_bit(self.csr.mstatus, MIE_BIT): # MIE ENABLE
@@ -64,72 +63,41 @@ class CPU:
                 self.skip_step = 0
 
 
-class REGS:
+class REGS(util.NamedArray):
 
     def __init__(self) -> None:
-        self._pc = 0
-        self._x = [0] * 32
+        super().__init__([0]*32, {'pc':0})
 
-    def get_x(self, idx):
-        if idx:
-            return self._x[idx]
-        return 0
-    
-    def set_x(self, idx, value):
-        if idx:
-            self._x[idx] = value&CPU.XMASK
+    def __getitem__(self, key):
+        if 0 == key:
+            return 0
+        else:
+            return super().__getitem__(key)
 
-    @property
-    def pc(self):
-        return self._pc
-    
-    @pc.setter
-    def pc(self, value):
-        self._pc = value&CPU.XMASK
+    def __setitem__(self, key, value):
+        if key:
+            super().__setitem__(key, value & 0xFFFFFFFF)
 
-    def __repr__(self) -> str:
-        return "pc:{},x:{}".format(hex(self._pc), [*map(hex,self._x)])
+    def __setattr__(self, name: str, value: Any) -> None:
+        if 'pc' == name:
+            self._inner_array[0] = value & 0xFFFFFFFF
+        else:
+            super().__setattr__(name, value)
 
 
-class CSR:
+class CSR(util.NamedArray):
 
     ADDR_MAP = {
-        0x300: 'mstatus',
-        0x304: 'mie',
-        0x305: 'mtvec',
+        'mstatus': 0x300,
+        'mie': 0x304,
+        'mtvec': 0x305,
 
-        0x341: 'mepc',
-        0x342: 'mcause',
-        0x344: 'mip',
+        'mepc': 0x341,
+        'mcause': 0x342,
+        'mip': 0x344,
 
-        0xF14: 'mhartid'
+        'mhartid': 0xF14
     }
 
     def __init__(self) -> None:
-        self.just_hold = [0]*4096
-        self.just_hold[0xf11] = 0xff0ff0ff  #mvendorid
-        #self.just_hold[0x301] = 0x40401101  #misa (XLEN=32, IMA+X) // should be 0×4080 1101
-        self.just_hold[0x301] = 0x40000100  #misa (XLEN=32, I)
-        self.mstatus = 0
-        self.mie = 0
-        self.mtvec = 0
-        self.mepc = 0
-        self.mcause = 0
-        self.mip = 0
-        self.mhartid = 0
-
-    def read(self, addr):
-        name = CSR.ADDR_MAP.get(addr)
-        return getattr(self, name) if name else self.just_hold[addr]
-
-    def write(self, addr, value):
-        name = CSR.ADDR_MAP.get(addr)
-        if name:
-            setattr(self, name, value)
-        else:
-            self.just_hold[addr] = value
-
-    def __repr__(self) -> str:
-        d = dict(self.__dict__)
-        del d['just_hold']
-        return "CSR({})".format(d)
+        super().__init__([0]*4096, CSR.ADDR_MAP)

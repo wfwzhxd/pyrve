@@ -1,9 +1,10 @@
+from typing import Any
 import struct
 
 bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
 
 def get_bit(value, bit):
-    return value & (1<<bit)
+    return 1 if bool(value & (1<<bit)) else 0
 
 def clear_bit(value, bit):
     return value & ~(1<<bit)
@@ -43,30 +44,60 @@ def u2s(value, bit_len):
 class LittleEndness:
 
     @staticmethod
+    def read8s(mem, address):
+        return struct.unpack('<b', mem.read(address, 1))[0]
+
+    @staticmethod
+    def write8s(mem, address, value):
+        mem.write(address, struct.pack('<b', value))
+
+    @staticmethod
     def read8u(mem, address):
-        data = mem.read(address, 1)
-        return data[0]&0xFF
+        return struct.unpack('<B', mem.read(address, 1))[0]
 
     @staticmethod
     def write8u(mem, address, value):
-        data = bytes([value&0XFF])
-        mem.write(address, data)
+        mem.write(address, struct.pack('<B', value))
     
+    @staticmethod
+    def read16s(mem, address):
+        return struct.unpack("<h", mem.read(address, 2))[0]
+
+    @staticmethod
+    def write16s(mem, address, value):
+        mem.write(address, struct.pack("<h", value))
+
     @staticmethod
     def read16u(mem, address):
         return struct.unpack("<H", mem.read(address, 2))[0]
     
     @staticmethod
     def write16u(mem, address, value):
-        mem.write(address, struct.pack("<H", value&0xFFFF))
+        mem.write(address, struct.pack("<H", value))
     
+    @staticmethod
+    def read32s(mem, address):
+        return struct.unpack("<l", mem.read(address, 4))[0]
+
+    @staticmethod
+    def write32s(mem, address, value):
+        mem.write(address, struct.pack("<l", value))
+
     @staticmethod
     def read32u(mem, address):
         return struct.unpack("<L", mem.read(address, 4))[0]
 
     @staticmethod
     def write32u(mem, address, value):
-        mem.write(address, struct.pack("<L", value&0xFFFFFFFF))
+        mem.write(address, struct.pack("<L", value))
+
+    @staticmethod
+    def read64s(mem, address):
+        return struct.unpack("<q", mem.read(address, 8))[0]
+
+    @staticmethod
+    def write64s(mem, address, value):
+        mem.write(address, struct.pack("<q", value))
 
     @staticmethod
     def read64u(mem, address):
@@ -74,4 +105,33 @@ class LittleEndness:
 
     @staticmethod
     def write64u(mem, address, value):
-        mem.write(address, struct.pack("<Q", value&0xFFFFFFFFFFFFFFFF))
+        mem.write(address, struct.pack("<Q", value))
+
+
+class NamedArray:
+
+    def __init__(self, _inner_array, _index_map) -> None:
+        self._inner_array = _inner_array
+        self._index_map = _index_map   # name:index
+
+    def __getitem__(self, key):
+        return self._inner_array[key]
+
+    def __setitem__(self, key, value):
+        self._inner_array[key] = value
+
+    def __getattr__(self, name):
+        if name in self._index_map:
+            return self._inner_array[self._index_map[name]]
+        raise AttributeError(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in ('_inner_array', '_index_map'):
+            super().__setattr__(name, value)
+        elif name in self._index_map:
+            self[self._index_map[name]] = value
+        else:
+            raise AttributeError(name)
+    
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + ": " + '[{}]'.format(', '.join(hex(x) for x in self._inner_array))

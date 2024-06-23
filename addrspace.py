@@ -1,8 +1,55 @@
 import collections
 import functools
 import logging
+import util
 
 logger = logging.getLogger(__name__)
+
+
+class ByteWrap:
+
+    SIGN_LEN_FUNC_READ_MAP = {
+        True:{
+            1:util.LittleEndness.read8s,
+            2:util.LittleEndness.read16s,
+            4:util.LittleEndness.read32s,
+            8:util.LittleEndness.read64s
+        },
+        False:{
+            1:util.LittleEndness.read8u,
+            2:util.LittleEndness.read16u,
+            4:util.LittleEndness.read32u,
+            8:util.LittleEndness.read64u
+        }
+    }
+
+    SIGN_LEN_FUNC_WRITE_MAP = {
+        True:{
+            1:util.LittleEndness.write8s,
+            2:util.LittleEndness.write16s,
+            4:util.LittleEndness.write32s,
+            8:util.LittleEndness.write64s
+        },
+        False:{
+            1:util.LittleEndness.write8u,
+            2:util.LittleEndness.write16u,
+            4:util.LittleEndness.write32u,
+            8:util.LittleEndness.write64u
+        }
+    }
+
+    def __init__(self, signed, byte_len, _addrspace) -> None:
+        if byte_len not in (1, 2, 4, 8):
+            raise ValueError("byte_len {} not valid".format(byte_len))
+        self._addrspace = _addrspace
+        self._read_func = ByteWrap.SIGN_LEN_FUNC_READ_MAP[bool(signed)][byte_len]
+        self._write_func = ByteWrap.SIGN_LEN_FUNC_WRITE_MAP[bool(signed)][byte_len]
+
+    def __getitem__(self, key):
+        return self._read_func(self._addrspace, key)
+
+    def __setitem__(self, key, value):
+        return self._write_func(self._addrspace, key, value)
 
 
 class InvalidAddress(Exception):
@@ -20,6 +67,14 @@ class AddrSpace:
         else:
             self.mem = None
         self.reserve = collections.defaultdict(set)
+        self.s8 = ByteWrap(True, 1, self)
+        self.u8 = ByteWrap(False, 1, self)
+        self.s16 = ByteWrap(True, 2, self)
+        self.u16 = ByteWrap(False, 2, self)
+        self.s32 = ByteWrap(True, 4, self)
+        self.u32 = ByteWrap(False, 4, self)
+        self.s64 = ByteWrap(True, 8, self)
+        self.u64 = ByteWrap(False, 8, self)
 
     def contain(self, addr):
         return addr >= self.start and addr <= self.end

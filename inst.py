@@ -2,6 +2,7 @@ import util
 import cpu
 
 bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
+ru = lambda v:v&0xFFFFFFFF      # reg value to unsigned
 
 class InstFormat:
     
@@ -93,57 +94,57 @@ class Format_J(InstFormat):
 class ADD(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)+_cpu.regs.get_x(self.rs2))
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] + _cpu.regs[self.rs2]
 
 class SUB(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)-_cpu.regs.get_x(self.rs2))
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] - _cpu.regs[self.rs2]
 
 class XOR(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)^_cpu.regs.get_x(self.rs2))
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] ^ _cpu.regs[self.rs2]
 
 class OR(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)|_cpu.regs.get_x(self.rs2))
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] | _cpu.regs[self.rs2]
 
 class AND(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)&_cpu.regs.get_x(self.rs2))
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] & _cpu.regs[self.rs2]
 
 class SLL(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)<<_cpu.regs.get_x(self.rs2))
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] << (_cpu.regs[self.rs2] & 0x1F)
 
 class SRL(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)>>_cpu.regs.get_x(self.rs2))
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] >> (_cpu.regs[self.rs2] & 0x1F)
 
 class SRA(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        rs1 = util.msb_extend(_cpu.regs.get_x(self.rs1), _cpu.XLEN, _cpu.XLEN+_cpu.regs.get_x(self.rs2))
-        _cpu.regs.set_x(self.rd, rs1>>_cpu.regs.get_x(self.rs2))
+        rs1 = util.msb_extend(_cpu.regs[self.rs1], _cpu.XLEN, _cpu.XLEN+_cpu.regs[self.rs2])
+        _cpu.regs[self.rd] = rs1>>(_cpu.regs[self.rs2] & 0x1F)
 
 class SLT(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        rs1 = util.u2s(_cpu.regs.get_x(self.rs1), _cpu.XLEN)
-        rs2 = util.u2s(_cpu.regs.get_x(self.rs2), _cpu.XLEN)
+        rs1 = util.u2s(_cpu.regs[self.rs1], _cpu.XLEN)
+        rs2 = util.u2s(_cpu.regs[self.rs2], _cpu.XLEN)
         v = 1 if rs1<rs2 else 0
-        _cpu.regs.set_x(self.rd, v)
+        _cpu.regs[self.rd] = v
 
 class SLTU(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        v = 1 if _cpu.regs.get_x(self.rs1)<_cpu.regs.get_x(self.rs2) else 0
-        _cpu.regs.set_x(self.rd, v)
+        v = 1 if _cpu.regs[self.rs1]<_cpu.regs[self.rs2] else 0
+        _cpu.regs[self.rd] = v
 
 
 # Base IMM:
@@ -151,147 +152,133 @@ class SLTU(Format_R):
 class ADDI(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)+self.imm)
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] + self.imm
 
 class XORI(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)^self.imm)
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] ^ self.imm
 
 class ORI(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)|self.imm)
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] | self.imm
 
 class ANDI(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)&self.imm)
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] & self.imm
 
 class SLLI(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         s = self.imm&0x1F
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)<<s)
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] << s
 
 class SRLI(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         s = self.imm&0x1F
-        _cpu.regs.set_x(self.rd, _cpu.regs.get_x(self.rs1)>>s)
+        _cpu.regs[self.rd] = _cpu.regs[self.rs1] >> s
 
 class SRAI(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
         s = self.imm&0x1F
-        rs1 = util.msb_extend(_cpu.regs.get_x(self.rs1), _cpu.XLEN, _cpu.XLEN+_cpu.regs.get_x(self.rs2))
-        _cpu.regs.set_x(self.rd, rs1>>s)
+        rs1 = util.msb_extend(_cpu.regs[self.rs1], _cpu.XLEN, _cpu.XLEN+_cpu.regs[self.rs2])
+        _cpu.regs[self.rd] = rs1 >> s
 
 class SLTI(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        rs1 = util.u2s(_cpu.regs.get_x(self.rs1), _cpu.XLEN)
+        rs1 = util.u2s(_cpu.regs[self.rs1], _cpu.XLEN)
         imm = util.u2s(self.imm, _cpu.XLEN)
         v = 1 if rs1<imm else 0
-        _cpu.regs.set_x(self.rd, v)
+        _cpu.regs[self.rd] = v
 
 class SLTIU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        v = 1 if _cpu.regs.get_x(self.rs1)<self.imm else 0
-        _cpu.regs.set_x(self.rd, v)
+        _cpu.regs[self.rd] = 1 if _cpu.regs[self.rs1]<ru(self.imm) else 0
 
 # Load Store:
 
 class LB(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read8u(_cpu._addrspace, address)
-        _cpu.regs.set_x(self.rd, util.msb_extend(v, 8, 32))
+        _cpu.regs[self.rd] = _cpu._addrspace.s8[_cpu.regs[self.rs1] + self.imm]
 
 class LH(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read16u(_cpu._addrspace, address)
-        _cpu.regs.set_x(self.rd, util.msb_extend(v, 16, 32))
+        _cpu.regs[self.rd] = _cpu._addrspace.s16[_cpu.regs[self.rs1] + self.imm]
 
 class LW(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read32u(_cpu._addrspace, address)
-        _cpu.regs.set_x(self.rd, v)
+        _cpu.regs[self.rd] = _cpu._addrspace.u32[_cpu.regs[self.rs1] + self.imm]
 
 class LBU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read8u(_cpu._addrspace, address)
-        _cpu.regs.set_x(self.rd, v)
+        _cpu.regs[self.rd] = _cpu._addrspace.u8[_cpu.regs[self.rs1] + self.imm]
 
 class LHU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        v = util.LittleEndness.read16u(_cpu._addrspace, address)
-        _cpu.regs.set_x(self.rd, v)
+        _cpu.regs[self.rd] = _cpu._addrspace.u16[_cpu.regs[self.rs1] + self.imm]
 
 class SB(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
-        address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write8u(_cpu._addrspace, address, _cpu.regs.get_x(self.rs2))
+        _cpu._addrspace.u8[_cpu.regs[self.rs1] + self.imm] = _cpu.regs[self.rs2] & 0xFF
 
 class SH(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
-        address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write16u(_cpu._addrspace, address, _cpu.regs.get_x(self.rs2)&0XFFFF)
+        _cpu._addrspace.u16[_cpu.regs[self.rs1] + self.imm] = _cpu.regs[self.rs2] & 0xFFFF
 
 class SW(Format_S):
 
     def exec(self, _cpu: cpu.CPU):
-        address = (_cpu.regs.get_x(self.rs1) + self.imm)&cpu.CPU.XMASK
-        util.LittleEndness.write32u(_cpu._addrspace, address, _cpu.regs.get_x(self.rs2))
+        _cpu._addrspace.u32[_cpu.regs[self.rs1] + self.imm] = _cpu.regs[self.rs2]
 
 # Branch:
 
 class BEQ(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
-        if (util.u2s(_cpu.regs.get_x(self.rs1), 32) == util.u2s(_cpu.regs.get_x(self.rs2), 32)):
+        if _cpu.regs[self.rs1] == _cpu.regs[self.rs2]:
             _cpu.regs.pc += self.imm
 
 class BNE(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
-        if (util.u2s(_cpu.regs.get_x(self.rs1), 32) != util.u2s(_cpu.regs.get_x(self.rs2), 32)):
+        if _cpu.regs[self.rs1] != _cpu.regs[self.rs2]:
             _cpu.regs.pc += self.imm
 
 class BLT(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
-        if (util.u2s(_cpu.regs.get_x(self.rs1), 32) < util.u2s(_cpu.regs.get_x(self.rs2), 32)):
+        if util.u2s(_cpu.regs[self.rs1], 32) < util.u2s(_cpu.regs[self.rs2], 32):
             _cpu.regs.pc += self.imm
 
 class BGE(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
-        if (util.u2s(_cpu.regs.get_x(self.rs1), 32) >= util.u2s(_cpu.regs.get_x(self.rs2), 32)):
+        if util.u2s(_cpu.regs[self.rs1], 32) >= util.u2s(_cpu.regs[self.rs2], 32):
             _cpu.regs.pc += self.imm
 
 class BLTU(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
-        if (_cpu.regs.get_x(self.rs1) < _cpu.regs.get_x(self.rs2)):
+        if (_cpu.regs[self.rs1] < _cpu.regs[self.rs2]):
             _cpu.regs.pc += self.imm
 
 class BGEU(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
-        if (_cpu.regs.get_x(self.rs1) >= _cpu.regs.get_x(self.rs2)):
+        if (_cpu.regs[self.rs1] >= _cpu.regs[self.rs2]):
             _cpu.regs.pc += self.imm
 
 # Jump:
@@ -299,16 +286,16 @@ class BGEU(Format_B):
 class JAL(Format_J):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.pc+4)
+        _cpu.regs[self.rd] = _cpu.regs.pc + 4
         _cpu.regs.pc += self.imm
 
 
 class JALR(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        rs1 = _cpu.regs.get_x(self.rs1)
-        _cpu.regs.set_x(self.rd, _cpu.regs.pc+4)
-        _cpu.regs.pc = rs1 + self.imm
+        old_pc = _cpu.regs.pc
+        _cpu.regs.pc = (_cpu.regs[self.rs1] + self.imm)&0xFFFFFFFE
+        _cpu.regs[self.rd] = old_pc + 4
 
 
 # Upper IMM:
@@ -316,12 +303,12 @@ class JALR(Format_I):
 class LUI(Format_U):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, self.imm<<12)
+        _cpu.regs[self.rd] = self.imm << 12
 
 class AUIPC(Format_U):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.set_x(self.rd, _cpu.regs.pc + (self.imm<<12))
+        _cpu.regs[self.rd] = _cpu.regs.pc + (self.imm<<12)
 
 # Environment
 
@@ -334,7 +321,7 @@ class Format_UI(Format_I):
 class ECALL(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
-        _cpu._go_mtrap(0x0000000B)
+        _cpu._go_mtrap(11)  #  Environment call from M-mode
 
 class EBREAK(Format_UI):
     pass
@@ -343,59 +330,54 @@ class MRET(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
         _cpu.regs.pc = _cpu.csr.mepc
-        _cpu.csr.mstatus = util.set_bit(_cpu.csr.mstatus, cpu.MIE_BIT)
+        _cpu.csr.mstatus |= 1 << cpu.MIE_BIT
 
 # CSR
 
 class CSRRW(Format_UI):
-    
+
     def exec(self, _cpu: cpu.CPU):
+        rs1 = _cpu.regs[self.rs1]
         if self.rd:
-            _cpu.regs.set_x(self.rd, _cpu.csr.read(self.imm))
-        _cpu.csr.write(self.imm, _cpu.regs.get_x(self.rs1))
+            _cpu.regs[self.rd] = _cpu.csr[self.imm]
+        _cpu.csr[self.imm] = rs1
 
 class CSRRS(Format_UI):
 
     def exec(self, _cpu: cpu.CPU):
-        old_csr = _cpu.csr.read(self.imm)
-        _cpu.regs.set_x(self.rd, old_csr)
-        new_v = _cpu.regs.get_x(self.rs1)
-        if new_v:
-            _cpu.csr.write(self.imm, old_csr|new_v)
+        rs1 = _cpu.regs[self.rs1]
+        _cpu.regs[self.rd] = _cpu.csr[self.imm]
+        if rs1:
+            _cpu.csr[self.imm] |= rs1
 
 class CSRRC(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
-        old_csr = _cpu.csr.read(self.imm)
-        _cpu.regs.set_x(self.rd, old_csr)
-        new_v = _cpu.regs.get_x(self.rs1)
-        if new_v:
-            _cpu.csr.write(self.imm, old_csr&~new_v)
+        rs1 = _cpu.regs[self.rs1]
+        _cpu.regs[self.rd] = _cpu.csr[self.imm]
+        if rs1:
+            _cpu.csr[self.imm] &= ~rs1
 
 class CSRRWI(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
         if self.rd:
-            _cpu.regs.set_x(self.rd, _cpu.csr.read(self.imm))
-        _cpu.csr.write(self.imm, self.rs1)
+            _cpu.regs[self.rd] = _cpu.csr[self.imm]
+        _cpu.csr[self.imm] = self.rs1
 
 class CSRRSI(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
-        old_csr = _cpu.csr.read(self.imm)
-        _cpu.regs.set_x(self.rd, old_csr)
-        new_v = self.rs1
-        if new_v:
-            _cpu.csr.write(self.imm, old_csr|new_v)
+        _cpu.regs[self.rd] = _cpu.csr[self.imm]
+        if self.rs1:
+            _cpu.csr[self.imm] |= self.rs1
 
 class CSRRCI(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
-        old_csr = _cpu.csr.read(self.imm)
-        _cpu.regs.set_x(self.rd, old_csr)
-        new_v = self.rs1
-        if new_v:
-            _cpu.csr.write(self.imm, old_csr&~new_v)
+        _cpu.regs[self.rd] = _cpu.csr[self.imm]
+        if self.rs1:
+            _cpu.csr[self.imm] &= ~self.rs1
 
 
 class FENCE(Format_I):
@@ -424,116 +406,92 @@ class FORMAT_ATOMIC(Format_R):
 class LRw(FORMAT_ATOMIC):
 
     def exec(self, _cpu: cpu.CPU):
-        rs1 = _cpu.regs.get_x(self.rs1)
-        mem_rs1 = util.LittleEndness.read32u(_cpu._addrspace, rs1)
-        _cpu.regs.set_x(self.rd, mem_rs1)
-        _cpu._addrspace.reserve[_cpu].add(rs1)
+        _cpu.regs[self.rd] = _cpu._addrspace.u32[_cpu.regs[self.rs1]]
+        _cpu._addrspace.reserve[_cpu].add(_cpu.regs[self.rs1])
 
 
 class SCw(FORMAT_ATOMIC):
 
     def exec(self, _cpu: cpu.CPU):
-        rs1 = _cpu.regs.get_x(self.rs1)
-        rs2 = _cpu.regs.get_x(self.rs2)
-        if rs1 in _cpu._addrspace.reserve[_cpu]:
-            util.LittleEndness.write32u(_cpu._addrspace, rs1, rs2)
-            _cpu.regs.set_x(self.rd, 0)
+        if _cpu.regs[self.rs1] in _cpu._addrspace.reserve[_cpu]:
+            _cpu._addrspace.u32[_cpu.regs[self.rs1]] = _cpu.regs[self.rs2]
+            _cpu.regs[self.rd] = 0
         else:
-            _cpu.regs.set_x(self.rd, 1)
+            _cpu.regs[self.rd] = 1
         _cpu._addrspace.reserve[_cpu].clear()
 
-
+import logging
 class FORMAT_AMO(FORMAT_ATOMIC):
 
     def exec(self, _cpu: cpu.CPU):
+        addr = _cpu.regs[self.rs1]
         # load
-        rs1 = _cpu.regs.get_x(self.rs1)
-        _cpu.regs.set_x(self.rd, util.LittleEndness.read32u(_cpu._addrspace, rs1))
+        mem_value = _cpu._addrspace.u32[addr]
+        rs2_value = _cpu.regs[self.rs2]
         # op
-        self.do_amo_op(_cpu)
+        mem_value, rd_value = self.get_memvalue_rdvalue(mem_value, rs2_value)
+        logging.debug(_cpu.regs)
+        # logging.debug("get_memvalue_rdvalue return {}".format(hex(value)))
         # store
-        util.LittleEndness.write32u(_cpu._addrspace, rs1, _cpu.regs.get_x(self.rd))
+        _cpu.regs[self.rd] = rd_value
+        _cpu._addrspace.u32[addr] = mem_value&0xFFFFFFFF
 
-    def do_amo_op(self, _cpu: cpu.CPU):
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        '''
+        return mem_value, rd_value
+        '''
         raise NotImplementedError()
 
 
 class AMOSWAPw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        _cpu.regs.set_x(self.rd, rs2)
-        _cpu.regs.set_x(self.rs2, rd)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return rs2_value, mem_value
 
 
 class AMOADDw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        value = rd + rs2
-        _cpu.regs.set_x(self.rd, value)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return rs2_value + mem_value, mem_value
 
 
 class AMOANDw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        value = rd & rs2
-        _cpu.regs.set_x(self.rd, value)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return rs2_value & mem_value, mem_value
 
 
 class AMOORw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        value = rd | rs2
-        _cpu.regs.set_x(self.rd, value)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return rs2_value | mem_value, mem_value
 
 
 class AMOXORw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        value = rd ^ rs2
-        _cpu.regs.set_x(self.rd, value)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return rs2_value ^ mem_value, mem_value
 
 
 class AMOMAXw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        value = max(util.u2s(rs2, 32), util.u2s(rd, 32))
-        _cpu.regs.set_x(self.rd, value)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return max(util.u2s(rs2_value, 32), util.u2s(mem_value, 32)), mem_value
 
 
 class AMOMINw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        value = min(util.u2s(rs2, 32), util.u2s(rd, 32))
-        _cpu.regs.set_x(self.rd, value)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return min(util.u2s(rs2_value, 32), util.u2s(mem_value, 32)), mem_value
 
 
 class AMOMAXUw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        value = max(rs2, rd)
-        _cpu.regs.set_x(self.rd, value)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return max(mem_value, rs2_value), mem_value
 
 
 class AMOMINUw(FORMAT_AMO):
 
-    def do_amo_op(self, _cpu: cpu.CPU):
-        rs2 = _cpu.regs.get_x(self.rs2)
-        rd = _cpu.regs.get_x(self.rd)
-        value = min(rs2, rd)
-        _cpu.regs.set_x(self.rd, value)
+    def get_memvalue_rdvalue(self, mem_value, rs2_value):
+        return min(mem_value, rs2_value), mem_value
