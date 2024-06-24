@@ -9,35 +9,56 @@ def decode(inst_value):
     import inst
     t = inst.InstFormat(inst_value)
     inst_class = None
-    if 0b0110011 == t.opcode:   # Base Reg
-        if 0x0 == t.funct3:
-            if 0x0 == t.funct7:
-                inst_class = inst.ADD
-            elif 0x20 == t.funct7:
-                inst_class = inst.SUB
+    if 0b0110011 == t.opcode:   
+        # Base Reg
+        if 0x1 == t.funct7: # MUL/DIV
+            if 0x0 == t.funct3:
+                inst_class = inst.MUL
+            elif 0x1 == t.funct3:
+                inst_class = inst.MULH
+            elif 0x2 == t.funct3:
+                inst_class = inst.MULHSU
+            elif 0x3 == t.funct3:
+                inst_class = inst.MULHU
+            elif 0x4 == t.funct3:
+                inst_class = inst.DIV
+            elif 0x5 == t.funct3:
+                inst_class = inst.DIVU
+            elif 0x6 == t.funct3:
+                inst_class = inst.REM
+            elif 0x7 == t.funct3:
+                inst_class = inst.REMU
             else:
                 pass
-        elif 0x4 == t.funct3 and 0x0 == t.funct7:
-            inst_class = inst.XOR
-        elif 0x6 == t.funct3 and 0x0 == t.funct7:
-            inst_class = inst.OR
-        elif 0x7 == t.funct3 and 0x0 == t.funct7:
-            inst_class = inst.AND
-        elif 0x1 == t.funct3 and 0x0 == t.funct7:
-            inst_class = inst.SLL
-        elif 0x5 == t.funct3:
-            if 0x0 == t.funct7:
-                inst_class = inst.SRL
-            elif 0x20 == t.funct7:
-                inst_class = inst.SRA
-            else:
-                pass
-        elif 0x2 == t.funct3 and 0x0 == t.funct7:
-            inst_class = inst.SLT
-        elif 0x3 == t.funct3 and 0x0 == t.funct7:
-            inst_class = inst.SLTU
         else:
-            pass
+            if 0x0 == t.funct3:
+                if 0x0 == t.funct7:
+                    inst_class = inst.ADD
+                elif 0x20 == t.funct7:
+                    inst_class = inst.SUB
+                else:
+                    pass
+            elif 0x4 == t.funct3 and 0x0 == t.funct7:
+                inst_class = inst.XOR
+            elif 0x6 == t.funct3 and 0x0 == t.funct7:
+                inst_class = inst.OR
+            elif 0x7 == t.funct3 and 0x0 == t.funct7:
+                inst_class = inst.AND
+            elif 0x1 == t.funct3 and 0x0 == t.funct7:
+                inst_class = inst.SLL
+            elif 0x5 == t.funct3:
+                if 0x0 == t.funct7:
+                    inst_class = inst.SRL
+                elif 0x20 == t.funct7:
+                    inst_class = inst.SRA
+                else:
+                    pass
+            elif 0x2 == t.funct3 and 0x0 == t.funct7:
+                inst_class = inst.SLT
+            elif 0x3 == t.funct3 and 0x0 == t.funct7:
+                inst_class = inst.SLTU
+            else:
+                pass
     elif 0b0010011 == t.opcode:  # Base Imm
         t = inst.Format_I(inst_value)
         if 0x0 == t.funct3:
@@ -131,7 +152,7 @@ def decode(inst_value):
             pass
     elif 0b0001111 == t.opcode: # Fence
         inst_class = inst.FENCE
-    if 0b0101111 == t.opcode:   # Atomic
+    elif 0b0101111 == t.opcode:   # Atomic
         t = inst.FORMAT_ATOMIC(inst_value)
         if 0x2 == t.funct3:
             if 0x02 == t.funct5:
@@ -158,8 +179,8 @@ def decode(inst_value):
                 inst_class = inst.AMOMAXUw
             else:
                 pass
+    else:
+        pass
     if not inst_class:
-        raise RuntimeError("Undecode inst({})".format(inst_value))
-    result = inst_class(inst_value)
-    logger.debug('value:{}, inst:{}'.format(inst_value, result))
-    return result
+        raise RuntimeError("Undecode inst({})".format(hex(inst_value)))
+    return inst_class(inst_value)

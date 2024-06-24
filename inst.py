@@ -1,5 +1,6 @@
 import util
 import cpu
+import math
 
 bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
 ru = lambda v:v&0xFFFFFFFF      # reg value to unsigned
@@ -495,3 +496,84 @@ class AMOMINUw(FORMAT_AMO):
 
     def get_memvalue_rdvalue(self, mem_value, rs2_value):
         return min(mem_value, rs2_value), mem_value
+
+
+# Mul/Div
+
+class Format_MULDIV(Format_R):
+    
+    def exec(self, _cpu: cpu.CPU):
+        rs1 = _cpu.regs[self.rs1]
+        rs2 = _cpu.regs[self.rs2]
+        _cpu.regs[self.rd] = self.calc_rd(rs1, rs2)
+
+    def calc_rd(self, rs1, rs2):
+        raise NotImplementedError()
+
+
+class MUL(Format_MULDIV):
+
+    def calc_rd(self, rs1, rs2):
+        return rs1 * rs2
+
+
+class MULH(Format_MULDIV):
+
+    def calc_rd(self, rs1, rs2):
+        return (util.u2s(rs1, 32) * util.u2s(rs2, 32))>>32
+
+
+class MULHSU(Format_MULDIV):
+
+    def calc_rd(self, rs1, rs2):
+        return (util.u2s(rs1, 32) * rs2)>>32
+
+
+class MULHU(Format_MULDIV):
+
+    def calc_rd(self, rs1, rs2):
+        return (rs1 * rs2)>>32
+
+
+class DIV(Format_MULDIV):
+
+    def calc_rd(self, rs1, rs2):
+        if rs2:
+            rs1 = util.u2s(rs1, 32)
+            rs2 = util.u2s(rs2, 32)
+            if rs1 == -(2**(32-1)) and rs2 == -1:
+                return -(2**(32-1))
+            return math.trunc(util.u2s(rs1, 32)/util.u2s(rs2, 32))
+        else:
+            return 0xFFFFFFFF
+
+
+class DIVU(Format_MULDIV):
+
+    def calc_rd(self, rs1, rs2):
+        if rs2:
+            return math.trunc(rs1/rs2)
+        else:
+            return -1
+
+
+class REM(Format_MULDIV):
+
+    def calc_rd(self, rs1, rs2):
+        if rs2:
+            rs1 = util.u2s(rs1, 32)
+            rs2 = util.u2s(rs2, 32)
+            if rs1 == -(2**(32-1)) and rs2 == -1:
+                return 0
+            return rs1-math.trunc(rs1/rs2)*rs2
+        else:
+            return rs1
+
+
+class REMU(Format_MULDIV):
+
+    def calc_rd(self, rs1, rs2):
+        if rs2:
+            return rs1-math.trunc(rs1/rs2)*rs2
+        else:
+            return rs1
