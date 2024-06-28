@@ -1,7 +1,15 @@
 from typing import Any
 import struct
+import functools
 
 bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
+
+def bitput(v, l, h, nv):
+    up = bitcut(v, h+1, int.bit_length(v)+ 1)<<(h+1)
+    mid = nv << l
+    down = bitcut(v, 0, l-1) if l else 0
+    # print("{} {} {}".format(bin(up), bin(mid), bin(down)))
+    return up | mid | down
 
 def get_bit(value, bit):
     return 1 if bool(value & (1<<bit)) else 0
@@ -135,3 +143,39 @@ class NamedArray:
     
     def __repr__(self) -> str:
         return self.__class__.__name__ + ": " + '[{}]'.format(', '.join(hex(x) for x in self._inner_array))
+
+
+def bit_container(cls_name, bitmap):
+    '''
+    bitmap: {
+        name:(low_bit, high_bit, def_value)
+    }
+    '''
+
+    def init(self, v=None):
+        if v:
+            self._value = v
+        else:
+            for name in self._bitmap.keys():
+                setattr(self, name, self._bitmap[name][2])
+
+    ns = {
+        '_value':0,
+        '_bitmap':dict(bitmap),
+        '__repr__': lambda x:'{}({})'.format(cls_name, x._value),
+        '__init__': init,
+        '__int__': lambda x:x._value
+    }
+    for name in bitmap:
+        bit_low = bitmap[name][0]
+        bit_high = bitmap[name][1]
+
+        def bitput2(self, nv, l, h):
+            self._value = bitput(self._value, l, h, nv)
+
+        _bitcut = functools.partial(lambda self, l, h: (self._value&((2<<h)-1))>>l, l=bit_low, h=bit_high)
+        _bitput = functools.partial(bitput2, l=bit_low, h=bit_high)
+
+        ns[name] = property(fget=_bitcut, fset=_bitput)
+
+    return type(cls_name, (object,), ns)

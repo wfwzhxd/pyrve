@@ -322,7 +322,8 @@ class Format_UI(Format_I):
 class ECALL(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
-        _cpu._go_mtrap(11)  #  Environment call from M-mode
+        cause = 11 if 0b11 == _cpu.mode else 8
+        _cpu._go_mtrap(cause)
 
 class EBREAK(Format_UI):
     pass
@@ -331,7 +332,17 @@ class MRET(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
         _cpu.regs.pc = _cpu.csr.mepc
-        _cpu.csr.mstatus |= 1 << cpu.MIE_BIT
+        _cpu.csr.mstatus.MIE = _cpu.csr.mstatus.MPIE
+        _cpu.csr.mstatus.MPIE = 1
+        _cpu.mode = _cpu.csr.mstatus.MPP
+        _cpu.csr.mstatus.MPP = 0    #?
+
+class WFI(Format_UI):
+
+    def exec(self, _cpu: cpu.CPU):
+        print("####WFI####")
+        pass
+
 
 # CSR
 

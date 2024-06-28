@@ -8,8 +8,6 @@ import functools
 
 logger = logging.getLogger(__name__)
 
-MTIME_BIT = 7
-MIE_BIT = 3
 
 class CPU:
 
@@ -21,16 +19,19 @@ class CPU:
         self.csr = CSR()
         self._addrspace = _addrspace
         self.skip_step = 0
+        self.mode = 0b11
 
     def _go_mtrap(self, mcause):
-        # MEPC=PC, MIE = 0, GO MTVEC
-        logger.debug("go_mtrap, mcause: {}".format(hex(mcause)))
+        logger.debug("go_mtrap, mode: {}, mcause {}".format(bin(self.mode), hex(mcause)))
         self.csr.mcause = mcause
         self.csr.mepc = self.regs.pc
-        self.csr.mstatus &= ~(1<<MIE_BIT)
+        self.csr.mstatus.MPIE = self.csr.mstatus.MIE
+        self.csr.mstatus.MIE = 0
+        self.csr.mstatus.MPP = self.mode
+        self.csr.mtval = 0
         self.regs.pc = self.csr.mtvec&0xFFFFFFFC  # Only Direct Mode
 
-    @functools.cache
+    # @functools.cache
     def _read_inst_value(self, pc):
         '''
             ASSERT TEXT CODE IS READONLY
@@ -47,6 +48,7 @@ class CPU:
             # exec inst
             cached_pc = self.regs.pc
             decoded_inst = decoder.decode(self._read_inst_value(self.regs.pc))
+            logger.debug(decoded_inst)
             decoded_inst.exec(self)
             if cached_pc == self.regs.pc:
                 self.regs.pc += 4  # IS THIS RIGHT?
@@ -55,10 +57,10 @@ class CPU:
                 # mtime
                 self._addrspace.u64[memory.MTIME_BASE] += self.skip_step
                 mtime_pend = 1 if self._addrspace.u64[memory.MTIME_BASE] >= self._addrspace.u64[memory.MTIMECMP_BASE] else 0
-                self.csr.mip = util.bit_set(self.csr.mip, MTIME_BIT, mtime_pend)
+                self.csr.mip.MTIP = mtime_pend
                 # handle interrupt
-                if util.get_bit(self.csr.mstatus, MIE_BIT): # MIE ENABLE
-                    if util.get_bit(self.csr.mip, MTIME_BIT) and util.get_bit(self.csr.mie, MTIME_BIT): # TIMER
+                if self.csr.mstatus.MIE: # MIE ENABLE
+                    if self.csr.mip.MTIP and self.csr.mie.MTIE: # TIMER
                         self._go_mtrap(0x80000007)
                 self.skip_step = 0
 
@@ -94,10 +96,40 @@ class CSR(util.NamedArray):
 
         'mepc': 0x341,
         'mcause': 0x342,
+        'mtval': 0x343,
         'mip': 0x344,
 
         'mhartid': 0xF14
     }
 
+    MSTATUS_BITMAP = {
+        'MIE': (3, 3, 0),
+        'MPIE': (7, 7, 0),
+        'MPP': (11, 12, 0b11)
+    }
+
+    MIE_BITMAP = {
+        'MTIE': (7, 7, 0)
+    }
+
+    MIP_BITMAP = {
+        'MTIP': (7, 7, 0)
+    }
+
     def __init__(self) -> None:
         super().__init__([0]*4096, CSR.ADDR_MAP)
+        setattr(self, 'mstatus', util.bit_container('mstatus', CSR.MSTATUS_BITMAP)())
+        setattr(self, 'mie', util.bit_container('mie', CSR.MIE_BITMAP)())
+        setattr(self, 'mip', util.bit_container('mip', CSR.MIP_BITMAP)())
+
+    def __getitem__(self, key):
+        return int(self._inner_array[key])
+    
+    def __setitem__(self, key, value):
+        if type(self._inner_array[key]) == int:
+            self._inner_array[key] = value
+        else:   # bit_container
+            self._inner_array[key]._value = value
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + ": " + '[{}]'.format(', '.join(hex(int(x)) for x in self._inner_array))

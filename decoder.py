@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@functools.lru_cache(maxsize=2048)
+@functools.lru_cache(maxsize=2048*10)
 def decode(inst_value):
     import inst
     t = inst.InstFormat(inst_value)
@@ -135,6 +135,8 @@ def decode(inst_value):
             inst_class = inst.EBREAK
         elif 0x302 == t.imm:
             inst_class = inst.MRET
+        elif 0x105 == t.imm:
+            inst_class = inst.WFI
         # CSR
         elif 0x1 == t.funct3:
             inst_class = inst.CSRRW
