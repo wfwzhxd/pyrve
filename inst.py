@@ -9,40 +9,19 @@ class InstFormat:
     
     def __init__(self, value) -> None:
         self.value = value
+        self.opcode = bitcut(self.value, 0, 6)
+        self.rd = bitcut(self.value, 7, 11)
+        self.rs1 = bitcut(self.value, 15, 19)
+        self.rs2 = bitcut(self.value, 20, 24)
+        self.funct3 = bitcut(self.value, 12, 14)
+        self.funct7 = bitcut(self.value, 25, 31)
+        self.imm = None
 
     def exec(self, _cpu:cpu.CPU):
         raise NotImplementedError(self.__class__)
     
-    @property
-    def opcode(self):
-        return bitcut(self.value, 0, 6)
-    
-    @property
-    def rd(self):
-        return bitcut(self.value, 7, 11)
-    
-    @property
-    def funct3(self):
-        return bitcut(self.value, 12, 14)
-    
-    @property
-    def rs1(self):
-        return bitcut(self.value, 15, 19)
-    
-    @property
-    def rs2(self):
-        return bitcut(self.value, 20, 24)
-    
-    @property
-    def funct7(self):
-        return bitcut(self.value, 25, 31)
-
-    @property
-    def imm(self):
-        return None
-    
     def __repr__(self) -> str:
-        return '{}[opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__.__name__, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, util.u2s(self.imm, 32) if self.imm != None else None)
+        return '{}[opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__.__name__, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, hex(self.imm) if self.imm != None else None)
 
 
 class Format_R(InstFormat):
@@ -50,44 +29,44 @@ class Format_R(InstFormat):
 
 class Format_I(InstFormat):
 
-    @property
-    def imm(self):
+    def __init__(self, value) -> None:
+        super().__init__(value)
         r = bitcut(self.value, 20, 31)
-        return util.msb_extend(r, 12, 32)
+        self.imm = util.msb_extend(r, 12, 32)
 
 class Format_S(InstFormat):
 
-    @property
-    def imm(self):
+    def __init__(self, value) -> None:
+        super().__init__(value)
         low = bitcut(self.value, 7, 11)
         high = bitcut(self.value, 25, 31)
         r = (high<<5)|low
-        return util.msb_extend(r, 12, 32)
+        self.imm = util.msb_extend(r, 12, 32)
 
 class Format_U(InstFormat):
 
-    @property
-    def imm(self):
+    def __init__(self, value) -> None:
+        super().__init__(value)
         r = bitcut(self.value, 12, 31)
-        return util.msb_extend(r, 20, 32)
+        self.imm = util.msb_extend(r, 20, 32)
 
 class Format_B(InstFormat):
 
-    @property
-    def imm(self):
+    def __init__(self, value) -> None:
+        super().__init__(value)
         low = bitcut(self.value, 8, 11)<<1
         high = bitcut(self.value, 25, 30)<<5
         r = (bitcut(self.value, 31, 31)<<12) | (bitcut(self.value, 7, 7)<<11) | high | low
-        return util.msb_extend(r, 13, 32)
+        self.imm = util.msb_extend(r, 13, 32)
 
 class Format_J(InstFormat):
 
-    @property
-    def imm(self):
+    def __init__(self, value) -> None:
+        super().__init__(value)
         low = bitcut(self.value, 21, 30)<<1
         high = bitcut(self.value, 12, 19)<<12
         r = (bitcut(self.value, 31, 31)<<20) | high | (bitcut(self.value, 20, 20)<<11) | low
-        return util.msb_extend(r, 21, 32)
+        self.imm = util.msb_extend(r, 21, 32)
 
 
 # Base REG:
@@ -315,9 +294,9 @@ class AUIPC(Format_U):
 
 class Format_UI(Format_I):
 
-    @property
-    def imm(self):
-        return super().imm & 0xFFF
+    def __init__(self, value) -> None:
+        super().__init__(value)
+        self.imm &= 0xFFF
 
 class ECALL(Format_UI):
     
@@ -340,7 +319,6 @@ class MRET(Format_UI):
 class WFI(Format_UI):
 
     def exec(self, _cpu: cpu.CPU):
-        print("####WFI####")
         pass
 
 
@@ -402,17 +380,11 @@ class FENCE(Format_I):
 
 class FORMAT_ATOMIC(Format_R):
 
-    @property
-    def aq(self):
-        return util.get_bit(self.value, 26)
-    
-    @property
-    def rl(self):
-        return util.get_bit(self.value, 25)
-    
-    @property
-    def funct5(self):
-        return bitcut(self.value, 27, 31)
+    def __init__(self, value) -> None:
+        super().__init__(value)
+        self.aq = util.get_bit(self.value, 26)
+        self.rl = util.get_bit(self.value, 25)
+        self.funct5 = bitcut(self.value, 27, 31)
 
 
 class LRw(FORMAT_ATOMIC):
