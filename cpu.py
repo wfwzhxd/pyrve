@@ -28,6 +28,7 @@ class CPU:
         self.csr.mstatus.MPIE = self.csr.mstatus.MIE
         self.csr.mstatus.MIE = 0
         self.csr.mstatus.MPP = self.mode
+        self.mode = 0b11
         self.csr.mtval = 0
         self.regs.pc = self.csr.mtvec&0xFFFFFFFC  # Only Direct Mode
 
