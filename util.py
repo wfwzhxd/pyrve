@@ -1,5 +1,4 @@
 from typing import Any
-import struct
 import functools
 
 bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
@@ -53,67 +52,67 @@ class LittleEndness:
 
     @staticmethod
     def read8s(mem, address):
-        return struct.unpack('<b', mem.read(address, 1))[0]
+        return int.from_bytes(mem.read(address, 1), byteorder='little', signed=True)
 
     @staticmethod
     def write8s(mem, address, value):
-        mem.write(address, struct.pack('<b', value))
+        mem.write(address, int.to_bytes(value, 1, byteorder='little', signed=True))
 
     @staticmethod
     def read8u(mem, address):
-        return struct.unpack('<B', mem.read(address, 1))[0]
+        return int.from_bytes(mem.read(address, 1), byteorder='little', signed=False)
 
     @staticmethod
     def write8u(mem, address, value):
-        mem.write(address, struct.pack('<B', value))
+        mem.write(address, int.to_bytes(value, 1, byteorder='little', signed=False))
     
     @staticmethod
     def read16s(mem, address):
-        return struct.unpack("<h", mem.read(address, 2))[0]
+        return int.from_bytes(mem.read(address, 2), byteorder='little', signed=True)
 
     @staticmethod
     def write16s(mem, address, value):
-        mem.write(address, struct.pack("<h", value))
+        mem.write(address, int.to_bytes(value, 2, byteorder='little', signed=True))
 
     @staticmethod
     def read16u(mem, address):
-        return struct.unpack("<H", mem.read(address, 2))[0]
+        return int.from_bytes(mem.read(address, 2), byteorder='little', signed=False)
     
     @staticmethod
     def write16u(mem, address, value):
-        mem.write(address, struct.pack("<H", value))
+        mem.write(address, int.to_bytes(value, 2, byteorder='little', signed=False))
     
     @staticmethod
     def read32s(mem, address):
-        return struct.unpack("<l", mem.read(address, 4))[0]
+        return int.from_bytes(mem.read(address, 4), byteorder='little', signed=True)
 
     @staticmethod
     def write32s(mem, address, value):
-        mem.write(address, struct.pack("<l", value))
+        mem.write(address, int.to_bytes(value, 4, byteorder='little', signed=True))
 
     @staticmethod
     def read32u(mem, address):
-        return struct.unpack("<L", mem.read(address, 4))[0]
+        return int.from_bytes(mem.read(address, 4), byteorder='little', signed=False)
 
     @staticmethod
     def write32u(mem, address, value):
-        mem.write(address, struct.pack("<L", value))
+        mem.write(address, int.to_bytes(value, 4, byteorder='little', signed=False))
 
     @staticmethod
     def read64s(mem, address):
-        return struct.unpack("<q", mem.read(address, 8))[0]
+        return int.from_bytes(mem.read(address, 8), byteorder='little', signed=True)
 
     @staticmethod
     def write64s(mem, address, value):
-        mem.write(address, struct.pack("<q", value))
+        mem.write(address, int.to_bytes(value, 8, byteorder='little', signed=True))
 
     @staticmethod
     def read64u(mem, address):
-        return struct.unpack("<Q", mem.read(address, 8))[0]
+        return int.from_bytes(mem.read(address, 8), byteorder='little', signed=False)
 
     @staticmethod
     def write64u(mem, address, value):
-        mem.write(address, struct.pack("<Q", value))
+        mem.write(address, int.to_bytes(value, 8, byteorder='little', signed=False))
 
 
 class NamedArray:
