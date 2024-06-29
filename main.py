@@ -18,22 +18,18 @@ def load_binary(fname):
         return f.read()
 
 def main():
-    code = load_binary('/home/hu2/linux-6.9.4/arch/riscv/boot/Image')
-    # code = load_binary('DownloadedImage')
+    code = load_binary('DownloadedImage')
     dtb = load_binary('sixtyfourmb.dtb')
-    dtb = load_binary('/tmp/qemu-virt.dtb')
     phy_size=1024*1024*64
-    _addrspace = memory.Memory(phy_size)
+    _addrspace = memory.Memory2(phy_size)
     _addrspace.write(0x80000000, code)
     dtb_addr = 0x80000000+phy_size-len(dtb)
     _addrspace.write(dtb_addr, dtb)
     _cpu = cpu.CPU(_addrspace)
     _cpu.regs.pc = 0x80000000
-    _cpu.regs.set_x(11, dtb_addr)
-
+    _cpu.regs[11] = dtb_addr
     import IPython
     IPython.embed()
-    #_cpu.run(1024)
 
 if __name__ == '__main__':
     main()
