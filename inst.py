@@ -301,8 +301,15 @@ class Format_UI(Format_I):
 class ECALL(Format_UI):
     
     def exec(self, _cpu: cpu.CPU):
-        cause = 11 if 0b11 == _cpu.mode else 8
-        _cpu._go_mtrap(cause)
+        if cpu.MODE_M == _cpu.mode:
+            cause = cpu.EXCEPTION_ECALL_FROM_M
+        elif cpu.MODE_S == _cpu.mode:
+            cause = cpu.EXCEPTION_ECALL_FROM_S
+        elif cpu.MODE_U == _cpu.mode:
+            cause = cpu.EXCEPTION_ECALL_FROM_U
+        else:
+            raise RuntimeError("unknown cpu mode:{}".format(_cpu.mode))
+        _cpu._go_trap(cause)
 
 class EBREAK(Format_UI):
     pass
@@ -315,6 +322,20 @@ class MRET(Format_UI):
         _cpu.csr.mstatus.MPIE = 1
         _cpu.mode = _cpu.csr.mstatus.MPP
         _cpu.csr.mstatus.MPP = 0    #?
+
+class SRET(Format_UI):
+    
+    def exec(self, _cpu: cpu.CPU):
+        _cpu.regs.pc = _cpu.csr.sepc
+        _cpu.csr.sstatus.SIE = _cpu.csr.sstatus.SPIE
+        _cpu.csr.sstatus.SPIE = 1
+        _cpu.mode = _cpu.csr.sstatus.SPP
+        _cpu.csr.sstatus.SPP = 0    #?
+
+class SFENCEvma(Format_R):
+
+    def exec(self, _cpu: cpu.CPU):
+        pass
 
 class WFI(Format_UI):
 

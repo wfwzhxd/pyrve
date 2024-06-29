@@ -138,7 +138,7 @@ class NamedArray:
         elif name in self._index_map:
             self[self._index_map[name]] = value
         else:
-            raise AttributeError(name)
+            super().__setattr__(name, value)
     
     def __repr__(self) -> str:
         return self.__class__.__name__ + ": " + '[{}]'.format(', '.join(hex(x) for x in self._inner_array))
