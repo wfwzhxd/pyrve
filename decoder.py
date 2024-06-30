@@ -129,18 +129,19 @@ def decode(inst_value):
         inst_class = inst.AUIPC
     elif 0b1110011 == t.opcode: # System
         t = inst.Format_UI(inst_value)
-        if 0x0 == t.funct3 and 0x0 == t.imm:
-            inst_class = inst.ECALL
-        elif 0x0 == t.funct3 and 0x1 == t.imm:
-            inst_class = inst.EBREAK
-        elif 0x302 == t.imm:
-            inst_class = inst.MRET
-        elif 0x102 == t.imm:
-            inst_class = inst.SRET
-        elif 0x105 == t.imm:
-            inst_class = inst.WFI
-        elif 0x09 == t.funct7:
-            inst_class = inst.SFENCEvma
+        if 0x0 == t.funct3:
+            if 0x0 == t.imm:
+                inst_class = inst.ECALL
+            elif 0x1 == t.imm:
+                inst_class = inst.EBREAK
+            elif 0x302 == t.imm:
+                inst_class = inst.MRET
+            elif 0x102 == t.imm:
+                inst_class = inst.SRET
+            elif 0x105 == t.imm:
+                inst_class = inst.WFI
+            elif 0x09 == t.funct7:
+                inst_class = inst.SFENCEvma
         # CSR
         elif 0x1 == t.funct3:
             inst_class = inst.CSRRW
