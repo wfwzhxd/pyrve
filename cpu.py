@@ -263,12 +263,12 @@ class MMU(addrspace.AddrSpace):
         pagefault = MMU.StorePageFault(addr) if write else MMU.LoadPageFault(addr)
         if MODE_M != self._cpu.mode and self._cpu.csr.satp.MODE:
             va = MMU.VA(addr)
-            pte_addr = self._cpu.csr.satp.PPN * MMU.PAGE_SIZE + va.VPN1
+            pte_addr = self._cpu.csr.satp.PPN * MMU.PAGE_SIZE + va.VPN1 * MMU.PTE_SIZE
             pte = MMU.PTE(self._addrspace.u32[pte_addr])
             if not pte.V or (1 == pte.W and 0 == pte.R):
                 raise pagefault    # page fault
             if not (pte.R or pte.X):    # next level
-                pte_addr = pte.PPN1 * MMU.PAGE_SIZE + va.VPN0
+                pte_addr = (pte.PPN1<<10|pte.PPN0) * MMU.PAGE_SIZE + va.VPN0 * MMU.PTE_SIZE
                 pte = MMU.PTE(self._addrspace.u32[pte_addr])
                 if not pte.V or (1 == pte.W and 0 == pte.R) or not (pte.R or pte.X):
                     raise pagefault    # page fault
