@@ -3,8 +3,9 @@ import peripheral
 import logging
 
 PHYMEM_BASE = 0x80000000
-MTIME_BASE = 0x11000000 + 0xbff8
-MTIMECMP_BASE = 0x11000000 + 0x4000
+CLINET_BASE = 0x2000000 #0x11000000
+MTIME_BASE = CLINET_BASE + 0xbff8
+MTIMECMP_BASE = CLINET_BASE + 0x4000
 
 class Memory1(addrspace.BufferAddrSpace):
     
@@ -40,7 +41,7 @@ class Memory2(addrspace.BufferAddrSpace):
         phy_mem = addrspace.BufferAddrSpace(PHYMEM_BASE, PHYMEM_BASE+phy_size-1, 'phy_mem', True)
         # mtime = addrspace.BufferAddrSpace(MTIME_BASE, MTIME_BASE+7, 'mtime', True)
         # mtimecmp = addrspace.BufferAddrSpace(MTIMECMP_BASE, MTIMECMP_BASE+7, 'mtimecmp', True)
-        clint = addrspace.BufferAddrSpace(0x11000000, 0x11000000+0x10000-1, 'clint', True)
+        clint = addrspace.BufferAddrSpace(CLINET_BASE, CLINET_BASE+0x10000-1, 'clint', True)
         uart = peripheral.UART_8250()
         ctrl = Ctrl(0x123, 0x123, 'ctrl', False)
         self.sub_space.extend([phy_mem, clint, uart, ctrl])

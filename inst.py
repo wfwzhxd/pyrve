@@ -21,7 +21,7 @@ class InstFormat:
         raise NotImplementedError(self.__class__)
     
     def __repr__(self) -> str:
-        return '{}[opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__.__name__, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, hex(self.imm) if self.imm != None else None)
+        return '{}[value:{:#x}, opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__.__name__, self.value, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, hex(self.imm) if self.imm != None else None)
 
 
 class Format_R(InstFormat):
@@ -335,7 +335,10 @@ class SRET(Format_UI):
 class SFENCEvma(Format_R):
 
     def exec(self, _cpu: cpu.CPU):
-        pass
+        if self.rs2 and _cpu.regs[self.rs2] in _cpu._addrspace.cache:
+            _cpu._addrspace.cache[_cpu.regs[self.rs2]].clear()
+        else:
+            _cpu._addrspace.cache.clear()
 
 class WFI(Format_UI):
 
