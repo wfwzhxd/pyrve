@@ -206,7 +206,9 @@ class CSR(util.NamedArray):
         'SPIE': (5, 5, 0),
         'MPIE': (7, 7, 0),
         'SPP': (8, 8, 0),
-        'MPP': (11, 12, 0b11)
+        'MPP': (11, 12, 0b11),
+        'SUM': (18, 18, 0),
+        'MXR': (19, 19, 0)
     }
 
     MIE_BITMAP = {
@@ -300,35 +302,75 @@ class MMU(addrspace.AddrSpace):
         super().__init__(0, 0xFFFFFFFF, self.__class__.__name__, False)
         self._cpu = _cpu
         self._addrspace = _addrspace
-        self.cache = collections.defaultdict(dict) # asid:{vaddr:phyaddr}
+        self.cache = collections.defaultdict(dict) # {asid:{vaddr&0xFFFFF000:(pte, pte_addr, superpage)}}
+
+    def find_pte(self, addr):
+        asid = self._cpu.csr.satp.ASID
+        key = addr & 0xFFFFF000
+        p =  self.cache[asid].get(key, None)
+        if p:
+            return p
+        result_error = (None, None, False)
+        va = MMU.VA(addr)
+        pte_addr = self._cpu.csr.satp.PPN * MMU.PAGE_SIZE + va.VPN1 * MMU.PTE_SIZE
+        pte = MMU.PTE(self._addrspace.u32[pte_addr])
+        if not pte.V or (1 == pte.W and 0 == pte.R):
+            return result_error    # page fault
+        if not (pte.R or pte.X):    # next level
+            if pte.W + pte.R + pte.X:   # should not happen
+                logger.error('PTE({}) at addr {} error: non-leaf pte RWX != 0'.format(pte, pte_addr))
+            pte_addr = (pte.PPN1<<10|pte.PPN0) * MMU.PAGE_SIZE + va.VPN0 * MMU.PTE_SIZE
+            pte = MMU.PTE(self._addrspace.u32[pte_addr])
+            if not pte.V or (1 == pte.W and 0 == pte.R) or not (pte.R or pte.X):
+                return result_error
+            superpage = False
+        else:
+            superpage = True
+        result_ok = (pte, pte_addr, superpage)
+        self.cache.get(asid)[key] = result_ok
+        return result_ok
 
     def translate_addr(self, addr, write=False):
         if MODE_M != self._cpu.mode and self._cpu.csr.satp.MODE:
-            asid = self._cpu.csr.satp.ASID
-            key = addr & 0xFFFFF000
-            p =  self.cache[asid].get(key, None)
-            if p:
-                return p|(addr&0xfff)
+            pte, pte_addr, superpage = self.find_pte(addr)
             pagefault = MMU.StorePageFault(addr) if write else MMU.LoadPageFault(addr)
             va = MMU.VA(addr)
-            pte_addr = self._cpu.csr.satp.PPN * MMU.PAGE_SIZE + va.VPN1 * MMU.PTE_SIZE
-            pte = MMU.PTE(self._addrspace.u32[pte_addr])
-            if not pte.V or (1 == pte.W and 0 == pte.R):
-                raise pagefault    # page fault
-            if not (pte.R or pte.X):    # next level
-                pte_addr = (pte.PPN1<<10|pte.PPN0) * MMU.PAGE_SIZE + va.VPN0 * MMU.PTE_SIZE
-                pte = MMU.PTE(self._addrspace.u32[pte_addr])
-                if not pte.V or (1 == pte.W and 0 == pte.R) or not (pte.R or pte.X):
-                    raise pagefault    # page fault
-                superpage = False
+            if not pte:
+                raise pagefault
+            if MODE_U == self._cpu.mode and not pte.U:
+                logger.debug('PTE({}) at addr {} error: U mode without U flag'.format(pte, pte_addr))
+                raise pagefault
+            if MODE_S == self._cpu.mode and pte.U and not self._cpu.csr.sstatus.SUM:
+                logger.debug('PTE({}) at addr {} error: S mode without SUM flag'.format(pte, pte_addr))
+                raise pagefault
+            if not self._cpu.csr.sstatus.MXR and not pte.R:
+                logger.debug('PTE({}) at addr {} error: MXR=0, pte.R=0'.format(pte, pte_addr))
+                raise pagefault
+            if superpage and pte.PPN0:
+                logger.debug('PTE({}) at addr {} error: MISALIGN superpage'.format(pte, pte_addr))
+                raise pagefault
+            if not pte.W and write:
+                logger.debug('PTE({}) at addr {} error: NO write perm'.format(pte, pte_addr))
+                raise pagefault
+            if addr == self._cpu.regs.pc:
+                if not pte.X:
+                    logger.debug('PTE({}) at addr {} error: NO exec perm'.format(pte, pte_addr))
+                    raise pagefault
             else:
-                superpage = True
-            # leaf, skip check, just return address
+                if not pte.R:
+                    logger.debug('PTE({}) at addr {} error: NO read perm'.format(pte, pte_addr))
+                    raise pagefault
+
+            if 0 == pte.A or (0 == pte.D and write):
+                logger.debug('PTE({}) at addr {} error: A/D flag not valid, do repare'.format(pte, pte_addr))
+                pte.A = 1
+                if write:
+                    pte.D = 1
+                self._addrspace.u32[pte_addr] = int(pte)
             pa = MMU.PA()
             pa.OFFSET = va.OFFSET
             pa.PPN0 = va.VPN0 if superpage else pte.PPN0
             pa.PPN1 = pte.PPN1
-            self.cache.get(asid)[key] = int(pa) & 0xFFFFF000
 
             return int(pa)
         else:
@@ -337,8 +379,8 @@ class MMU(addrspace.AddrSpace):
     def read(self, addr, length):
         start_offset = addr&0xfff
         end_offset = (addr+length-1)&0xfff
-        if end_offset < start_offset:
-            print("################read addr {} length {} across page".format(addr, length))
+        if end_offset < start_offset:   # should not happen
+            logger.error("read addr {} length {} across page".format(addr, length))
         return self._addrspace.read(self.translate_addr(addr), length)
 
     def write(self, addr, data):
@@ -346,5 +388,5 @@ class MMU(addrspace.AddrSpace):
         start_offset = addr&0xfff
         end_offset = (addr+length-1)&0xfff
         if end_offset < start_offset:
-            print("################write addr {} length {} across page".format(addr, length))
+            logger.error("write addr {} length {} across page".format(addr, length))
         self._addrspace.write(self.translate_addr(addr, write=True), data)
