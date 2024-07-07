@@ -4,7 +4,6 @@ import memory
 import decoder
 import util
 import logging
-import functools
 import collections
 
 logger = logging.getLogger(__name__)
