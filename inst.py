@@ -414,19 +414,21 @@ class FORMAT_ATOMIC(Format_R):
 class LRw(FORMAT_ATOMIC):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs[self.rd] = _cpu._addrspace.u32[_cpu.regs[self.rs1]]
-        _cpu._addrspace.reserve[_cpu].add(_cpu.regs[self.rs1])
+        data = _cpu._addrspace.u32[_cpu.regs[self.rs1]]
+        _cpu.regs[self.rd] = data
+        _cpu._addrspace.reserve[_cpu] = str(_cpu.regs[self.rs1]) + str(data)
 
 
 class SCw(FORMAT_ATOMIC):
 
     def exec(self, _cpu: cpu.CPU):
-        if _cpu.regs[self.rs1] in _cpu._addrspace.reserve[_cpu]:
+        data = _cpu._addrspace.u32[_cpu.regs[self.rs1]]
+        if  str(_cpu.regs[self.rs1]) + str(data) == _cpu._addrspace.reserve[_cpu]:
             _cpu._addrspace.u32[_cpu.regs[self.rs1]] = _cpu.regs[self.rs2]
             _cpu.regs[self.rd] = 0
         else:
             _cpu.regs[self.rd] = 1
-        _cpu._addrspace.reserve[_cpu].clear()
+        _cpu._addrspace.reserve[_cpu] = None
 
 import logging
 class FORMAT_AMO(FORMAT_ATOMIC):
