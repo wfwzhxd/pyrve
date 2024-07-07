@@ -3,8 +3,6 @@ import functools
 import logging
 import util
 
-logger = logging.getLogger(__name__)
-
 
 class ByteWrap:
 
@@ -59,6 +57,7 @@ class InvalidAddress(Exception):
 class AddrSpace:
 
     def __init__(self, start, end, name=None, init_mem=False) -> None:
+        self.logger = logging.getLogger(name if name else self.__class__.__name__)
         self.name = name
         self.start, self.end = start, end
         self.sub_space = []
@@ -112,7 +111,7 @@ class BufferAddrSpace(AddrSpace):
         else:
             if _end <= self.end:
                 result = self.mem[_start-self.start: _end-self.start+1]
-                logging.getLogger(self.name).debug("read addr {}: {}".format(hex(addr), result))
+                self.logger.debug("read addr {}: {}".format(hex(addr), result))
                 return result
             else:
                 raise InvalidAddress("{} read addr {}, len {}".format(self.name, hex(addr), length))
@@ -124,7 +123,7 @@ class BufferAddrSpace(AddrSpace):
             space.write(addr, data)
         else:
             if _end <= self.end:
-                logging.getLogger(self.name).debug("write addr {}: {}".format(hex(addr), data))
+                self.logger.debug("write addr {}: {}".format(hex(addr), data))
                 space.mem[_start-self.start: _end-self.start+1] = data
             else:
                 raise InvalidAddress("{} write {}, len {}".format(self.name, hex(addr), len(data)))
@@ -146,11 +145,11 @@ class ByteAddrSpace(AddrSpace):
         for idx in range(length):
             _addr = addr + idx
             result[idx] = self._get_space_for_rw(_addr).read_byte(_addr)
-        logging.getLogger(self.name).debug("read addr {}: {}".format(hex(addr), result))
+        self.logger.debug("read addr {}: {}".format(hex(addr), result))
         return result
 
     def write(self, addr, data):
-        logging.getLogger(self.name).debug("write addr {}: {}".format(hex(addr), data))
+        self.logger.debug("write addr {}: {}".format(hex(addr), data))
         for idx in range(len(data)):
             _addr = addr + idx
             self._get_space_for_rw(_addr).write_byte(_addr, data[idx])
