@@ -67,19 +67,24 @@ class CPU:
 
     def _go_trap(self, cause, tval=0):
         logger.debug("_go_trap, mode: {}, cause {}, tval: {}".format(bin(self.mode), hex(cause), hex(tval)))
-        if MODE_M == self.mode:
-            self._go_mtrap(cause, tval)
-        else:
-            if cause>>31:   # msb=1, interrupt
-                if util.get_bit(self.csr.mideleg, cause&0x7FFFFFFF):
-                    self._go_strap(cause, tval)
-                else:
-                    self._go_mtrap(cause, tval)
-            else:   # exception
-                if util.get_bit(self.csr.medeleg, cause):   # not support medelegh
-                    self._go_strap(cause, tval)
-                else:
-                    self._go_mtrap(cause, tval)
+        if cause>>31:   # msb=1, interrupt
+            a = (MODE_M == self.mode and self.csr.mstatus.MIE) or MODE_M > self.mode
+            c = util.get_bit(self.csr.mideleg, cause&0x7FFFFFFF)
+            if a and not c: 
+                self._go_mtrap(cause, tval)
+                return True
+            a = (MODE_S == self.mode and self.csr.sstatus.SIE) or MODE_S > self.mode
+            if a and c:
+                self._go_strap(cause, tval)
+                return True
+            logger.debug("interrupt {} not handled, mode={}, MIE={}, SIE={}".format(cause, self.mode, self.csr.mstatus.MIE, self.csr.sstatus.SIE))
+            return False
+        else:   # exception
+            if MODE_M > self.mode and util.get_bit(self.csr.medeleg, cause):   # not support medelegh
+                self._go_strap(cause, tval)
+            else:
+                self._go_mtrap(cause, tval)
+        return True
 
 
     def run(self, step):
@@ -122,15 +127,15 @@ class CPU:
                 self.skip_step = 0
                 mtime_pend = 1 if self._addrspace_nommu.u64[memory.MTIME_BASE] >= self._addrspace_nommu.u64[memory.MTIMECMP_BASE] else 0
                 self.csr.mip.MTIP = mtime_pend
-                # handle interrupt
-                if self.csr.mstatus.MIE: # MIE ENABLE
-                    if self.csr.mip.MTIP and self.csr.mie.MTIE: # TIMER
-                        self._go_trap(INTERRUPT_TIMER_M)
+
+                # check interrupt
+                if self.csr.mip.MTIP and self.csr.mie.MTIE: # MTIMER
+                    if self._go_trap(INTERRUPT_TIMER_M):
                         continue
 
-                if MODE_U == self.mode or (MODE_S == self.mode and self.csr.sstatus.SIE):
-                    if self.csr.sip.STIP and self.csr.sie.STIE: # TIMER
-                        self._go_trap(INTERRUPT_TIMER_S)
+                if self.csr.sip.STIP and self.csr.sie.STIE: # STIMER
+                    if self._go_trap(INTERRUPT_TIMER_S):
+                        continue
 
 class REGS(util.NamedArray):
 
