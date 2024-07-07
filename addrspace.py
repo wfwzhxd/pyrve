@@ -66,7 +66,7 @@ class AddrSpace:
             self.mem = bytearray(end-start+1)
         else:
             self.mem = None
-        self.reserve = collections.defaultdict(set)
+        self.reserve = {}
         self.s8 = ByteWrap(True, 1, self)
         self.u8 = ByteWrap(False, 1, self)
         self.s16 = ByteWrap(True, 2, self)
