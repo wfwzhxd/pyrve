@@ -169,12 +169,20 @@ def bit_container(cls_name, bitmap):
         bit_low = bitmap[name][0]
         bit_high = bitmap[name][1]
 
-        def bitput2(self, nv, l, h):
-            self._value = bitput(self._value, l, h, nv)
+        if bit_low == bit_high: # single bit, easy to handle
+            def bitput2(self, nv, b):
+                self._value = bit_set(self._value, b, nv)
 
-        _bitcut = functools.partial(lambda self, l, h: (self._value&((2<<h)-1))>>l, l=bit_low, h=bit_high)
-        _bitput = functools.partial(bitput2, l=bit_low, h=bit_high)
+            _bitcut = functools.partial(lambda self, b: (self._value>>b)&1, b=bit_low)
+            _bitput = functools.partial(bitput2, b=bit_low)
+            ns[name] = property(fget=_bitcut, fset=_bitput)
+        else:
+            def bitput2(self, nv, l, h):
+                self._value = bitput(self._value, l, h, nv)
 
-        ns[name] = property(fget=_bitcut, fset=_bitput)
+            _bitcut = functools.partial(lambda self, l, h: (self._value&((2<<h)-1))>>l, l=bit_low, h=bit_high)
+            _bitput = functools.partial(bitput2, l=bit_low, h=bit_high)
+
+            ns[name] = property(fget=_bitcut, fset=_bitput)
 
     return type(cls_name, (object,), ns)

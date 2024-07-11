@@ -62,7 +62,7 @@ class AddrSpace:
         self.start, self.end = start, end
         self.sub_space = []
         if init_mem:
-            self.mem = bytearray(end-start+1)
+            self.mem = memoryview(bytearray(end-start+1))
         else:
             self.mem = None
         self.reserve = {}

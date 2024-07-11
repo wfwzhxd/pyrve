@@ -5,6 +5,8 @@ import decoder
 import util
 import logging
 import collections
+import time
+
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ class CPU:
 
     XLEN = 32
     XMASK = 0xFFFFFFFF
+    TIMEBASE_FREQ = 100
 
     def __init__(self, _addrspace:addrspace.AddrSpace) -> None:
         self.regs = REGS()
@@ -41,6 +44,9 @@ class CPU:
         self._addrspace = MMU(self, _addrspace)
         self.skip_step = 0
         self.mode = MODE_M
+        self._start_time = time.monotonic_ns()
+        self.inst_cache = collections.defaultdict(dict)    # {ppn, {vaddr:inst}}
+
 
     def _go_mtrap(self, mcause, mtval=0):
         logger.debug("go_mtrap, mode: {}, mcause {}".format(bin(self.mode), hex(mcause)))
@@ -96,7 +102,11 @@ class CPU:
             # exec inst
             cached_pc = self.regs.pc
             try:
-                decoded_inst = decoder.decode(self._addrspace.u32[self.regs.pc])
+                paddr = self._addrspace.translate_addr(cached_pc)
+                decoded_inst = self.inst_cache[paddr>>12].get(cached_pc)
+                if not decoded_inst:
+                    decoded_inst = decoder.decode(self._addrspace.u32[cached_pc])
+                    self.inst_cache[paddr>>12][cached_pc] = decoded_inst
             except MMU.PageFaultException as e:
                 self._go_trap(EXCEPTION_INST_PAGE_FAULT, e.vaddr)
                 continue
@@ -117,14 +127,14 @@ class CPU:
             if cached_pc == self.regs.pc:
                 self.regs.pc += 4  # IS THIS RIGHT?
 
-            if self.skip_step>>10:
+            if self.skip_step>2048:
                 # mtime
-                self._addrspace_nommu.u64[memory.MTIME_BASE] += self.skip_step
-                _time = self._addrspace_nommu.u64[memory.MTIME_BASE]
-                self.csr.time = _time & 0xFFFFFFFF
-                self.csr.timeh = _time>>32
+                cur_time = int((time.monotonic_ns() - self._start_time) * 1E-9 * CPU.TIMEBASE_FREQ)
+                self._addrspace_nommu.u64[memory.MTIME_BASE] = cur_time
+                self.csr.time = cur_time & 0xFFFFFFFF
+                self.csr.timeh = cur_time>>32
                 self.skip_step = 0
-                mtime_pend = 1 if self._addrspace_nommu.u64[memory.MTIME_BASE] >= self._addrspace_nommu.u64[memory.MTIMECMP_BASE] else 0
+                mtime_pend = 1 if cur_time >= self._addrspace_nommu.u64[memory.MTIMECMP_BASE] else 0
                 self.csr.mip.MTIP = mtime_pend
 
                 # check interrupt
@@ -199,6 +209,8 @@ class CSR(util.NamedArray):
         'mhartid': 0xF14
     }
 
+    ADDRS = set(ADDR_MAP.values())
+
     MSTATUS_BITMAP = {
         'SIE': (1, 1, 0),
         'MIE': (3, 3, 0),
@@ -238,24 +250,17 @@ class CSR(util.NamedArray):
 
     def __getitem__(self, key):
         value = int(self._inner_array[key])
-        if key in CSR.ADDR_MAP.values(): 
-            _d = {v:k for k,v in CSR.ADDR_MAP.items()}
-            logger.debug('read csr: {}={}'.format(_d[key], hex(value)))
-        else:
+        if key not in CSR.ADDRS: 
             self._cpu._go_trap(EXCEPTION_ILLEGAL_INSTRUCTION, self._cpu.regs.pc)
             raise GOTRAP()
         return value
     
     def __setitem__(self, key, value):
-        if key in CSR.ADDR_MAP.values(): 
-            _d = {v:k for k,v in CSR.ADDR_MAP.items()}
-            logger.debug('write csr: {}={}'.format(_d[key], hex(int(value))))
-        else:
+        if key not in CSR.ADDRS: 
             self._cpu._go_trap(EXCEPTION_ILLEGAL_INSTRUCTION, self._cpu.regs.pc)
             raise GOTRAP()
         if type(self._inner_array[key]) == int:
-            if key in CSR.ADDR_MAP.values():
-                self._inner_array[key] = value
+            self._inner_array[key] = value
         else:   # bit_container
             self._inner_array[key]._value = value
 
@@ -302,13 +307,17 @@ class MMU(addrspace.AddrSpace):
         self._cpu = _cpu
         self._addrspace = _addrspace
         self.cache = collections.defaultdict(dict) # {asid:{vaddr&0xFFFFF000:(pte, pte_addr, superpage)}}
+        self.cache_hit = 0
+        self.cache_mis = 0
 
     def find_pte(self, addr):
         asid = self._cpu.csr.satp.ASID
         key = addr & 0xFFFFF000
         p =  self.cache[asid].get(key, None)
         if p:
+            self.cache_hit += 1
             return p
+        self.cache_mis += 1
         result_error = (None, None, False)
         va = MMU.VA(addr)
         pte_addr = self._cpu.csr.satp.PPN * MMU.PAGE_SIZE + va.VPN1 * MMU.PTE_SIZE
@@ -370,10 +379,12 @@ class MMU(addrspace.AddrSpace):
             pa.OFFSET = va.OFFSET
             pa.PPN0 = va.VPN0 if superpage else pte.PPN0
             pa.PPN1 = pte.PPN1
-
-            return int(pa)
+            paddr = int(pa)
         else:
-            return addr
+            paddr = addr
+        if write:
+            self._cpu.inst_cache[paddr>>12].clear()
+        return paddr
 
     def read(self, addr, length):
         start_offset = addr&0xfff
