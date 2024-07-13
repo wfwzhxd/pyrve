@@ -586,3 +586,12 @@ class REMU(Format_MULDIV):
             return rs1-math.trunc(rs1/rs2)*rs2
         else:
             return rs1
+
+
+class CBOzero(Format_I):
+
+    BLOCK_SIZE = 4096
+
+    def exec(self, _cpu: cpu.CPU):
+        # print("!!!!!!!!!!!!!!!!!CBO.ZERO {}".format(hex(_cpu.regs[self.rs1])))
+        _cpu._addrspace.write(_cpu.regs[self.rs1], bytes(CBOzero.BLOCK_SIZE))

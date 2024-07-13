@@ -46,6 +46,36 @@ class Memory2(addrspace.BufferAddrSpace):
         ctrl = Ctrl(0x123, 0x123, 'ctrl', False)
         self.sub_space.extend([phy_mem, clint, uart, ctrl])
 
+class Memory3(addrspace.AddrSpace):
+
+    def __init__(self, phy_size=1024*1024) -> None:
+        super().__init__(0, 0xFFFFFFFF, 'memory', False)
+        self.phy_mem = memoryview(bytearray(phy_size))
+        self.clint_mem = memoryview(bytearray(0x10000))
+        self.uart = peripheral.UART_8250()
+
+    def read(self, addr, length):
+        if addr >= PHYMEM_BASE:
+            offset = addr - PHYMEM_BASE
+            return self.phy_mem[offset: offset + length]
+        if addr >= CLINET_BASE and addr < CLINET_BASE+0x10000:
+            offset = addr - CLINET_BASE
+            return self.clint_mem[offset: offset + length]
+        return self.uart.read(addr, length)
+
+    def write(self, addr, data):
+        length = len(data)
+        if addr >= PHYMEM_BASE:
+            offset = addr - PHYMEM_BASE
+            self.phy_mem[offset: offset + length] = data
+            return
+        if addr >= CLINET_BASE and addr < CLINET_BASE+0x10000:
+            offset = addr - CLINET_BASE
+            # print("{} {} {}".format(offset, offset + length, data))
+            self.clint_mem[offset: offset + length] = data
+            return
+        return self.uart.write(addr, data)
+
 
 import sys
 

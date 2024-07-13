@@ -1,6 +1,8 @@
 import addrspace
 import sys
 import logging
+import queue
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -8,14 +10,28 @@ class UART_8250(addrspace.ByteAddrSpace):
 
     def __init__(self) -> None:
         super().__init__(0x10000000, 0x10000100, 'uart_8250', False)
-        self._kbhit = KBHit()
+        self.read_queue = queue.Queue(128)
+        self.should_read = threading.Event()
+        threading.Thread(target=self._monitor_kb, daemon=True).start()
+
+    def _monitor_kb(self):
+        _kbhit = KBHit()
+        while True:
+            self.should_read.wait()
+            self.should_read.clear()
+            if _kbhit.kbhit():
+                c = ord(_kbhit.getch())
+                self.read_queue.put(c)
 
     def read_byte(self, addr):
+        self.should_read.set()
+        result = 0
         if 0x10000005 == addr:
-             return 0x60 | self._kbhit.kbhit()
-        if 0x10000000 == addr and self._kbhit.kbhit():
-            return ord(self._kbhit.getch())&0xFF
-        return 0
+             result = 0x60 | (1 if self.read_queue.qsize() != 0 else 0)
+        if 0x10000000 == addr and self.read_queue.qsize() != 0:
+            result = self.read_queue.get()
+            self.should_read.set()
+        return result
 
     def write_byte(self, addr, value):
         if 0x10000000 == addr:

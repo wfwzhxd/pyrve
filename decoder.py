@@ -158,7 +158,14 @@ def decode(inst_value):
         else:
             pass
     elif 0b0001111 == t.opcode: # Fence
-        inst_class = inst.FENCE
+        t = inst.Format_I(inst_value)
+        if 0 == t.funct3:
+            inst_class = inst.FENCE
+        if 1 == t.funct3:
+            inst_class = inst.FENCE # fenci.i, current not use
+        elif 2 == t.funct3: # CBO
+            if 4 == t.imm:
+                inst_class = inst.CBOzero
     elif 0b0101111 == t.opcode:   # Atomic
         t = inst.FORMAT_ATOMIC(inst_value)
         if 0x2 == t.funct3:

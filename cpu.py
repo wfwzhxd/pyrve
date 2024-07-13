@@ -35,7 +35,7 @@ class CPU:
 
     XLEN = 32
     XMASK = 0xFFFFFFFF
-    TIMEBASE_FREQ = 100
+    TIMEBASE_FREQ = 1000000
 
     def __init__(self, _addrspace:addrspace.AddrSpace) -> None:
         self.regs = REGS()
@@ -129,7 +129,7 @@ class CPU:
 
             if self.skip_step>2048:
                 # mtime
-                cur_time = int((time.monotonic_ns() - self._start_time) * 1E-9 * CPU.TIMEBASE_FREQ)
+                cur_time = int((time.monotonic_ns() - self._start_time) * 1E-9 * CPU.TIMEBASE_FREQ * 0.1)   # *0.1 May because the emulator run too slow
                 self._addrspace_nommu.u64[memory.MTIME_BASE] = cur_time
                 self.csr.time = cur_time & 0xFFFFFFFF
                 self.csr.timeh = cur_time>>32
@@ -183,6 +183,7 @@ class CSR(util.NamedArray):
         'sstatus': 0x100,
         'sie': 0x104,
         'stvec': 0x105,
+        'senvcfg': 0x10A,
 
         'sscratch': 0x140,
         'sepc': 0x141,
