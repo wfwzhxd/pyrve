@@ -3,171 +3,73 @@ import sys
 import logging
 import queue
 import threading
+import socketserver
+import socket
 
 logger = logging.getLogger(__name__)
 
 class UART_8250(addrspace.ByteAddrSpace):
 
-    def __init__(self) -> None:
-        super().__init__(0x10000000, 0x10000100, 'uart_8250', False)
-        self.read_queue = queue.Queue(128)
-        self.should_read = threading.Event()
-        threading.Thread(target=self._monitor_kb, daemon=True).start()
+    BUFFER_SIZE = 10 * 1024
 
-    def _monitor_kb(self):
-        _kbhit = KBHit()
+    def __init__(self, base, host='127.0.0.1', port=8250) -> None:
+        super().__init__(base, 0x100, 'uart_8250@{}[({}, {})]'.format(hex(base), host, port), False)
+        self.read_queue = queue.Queue(UART_8250.BUFFER_SIZE)
+        self.write_queue = queue.Queue(UART_8250.BUFFER_SIZE)
+        self.rw_event = threading.Event()
+        self.server = socketserver.ThreadingTCPServer((host, port), self._socket_handler, bind_and_activate=False)
+        self.server.allow_reuse_address = True
+        self.server.allow_reuse_port = True
+        self.server.server_bind()
+        self.server.server_activate()
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.client_id = 0
+
+    def _socket_handler(self, request:socket.socket, client_address, server):
+        self.client_id += 1
+        my_client_id = self.client_id
+        request.settimeout(0.01)
+        MAX_HANDLED = 1024
         while True:
-            self.should_read.wait()
-            self.should_read.clear()
-            if _kbhit.kbhit():
-                c = ord(_kbhit.getch())
-                self.read_queue.put(c)
+            if my_client_id != self.client_id:
+                return
+            # read
+            try:
+                readed = request.recv(MAX_HANDLED)
+                if readed:
+                    for r in readed:
+                        self.read_queue.put_nowait(r)
+            except (socket.timeout, queue.Full):
+                pass
+            # write
+            sent = 0
+            while sent < MAX_HANDLED and self.write_queue.qsize() > 0:
+                try:
+                    write_char = self.write_queue.get_nowait()
+                    request.send(bytes([write_char]))
+                    sent += 1
+                except (socket.timeout, queue.Empty):
+                    pass
+            if self.write_queue.qsize() == 0:
+                self.rw_event.wait(2)
+                self.rw_event.clear()
 
     def read_byte(self, addr):
-        self.should_read.set()
+        self.rw_event.set()
         result = 0
         if 0x10000005 == addr:
              result = 0x60 | (1 if self.read_queue.qsize() != 0 else 0)
         if 0x10000000 == addr and self.read_queue.qsize() != 0:
-            result = self.read_queue.get()
-            self.should_read.set()
+            try:
+                result = self.read_queue.get_nowait()
+            except queue.Empty:
+                pass
         return result
 
     def write_byte(self, addr, value):
         if 0x10000000 == addr:
-            sys.stdout.write(chr(value))
-            sys.stdout.flush()
-
-
-# COPY FROM https://stackoverflow.com/a/22085679
-#!/usr/bin/env python
-'''
-A Python class implementing KBHIT, the standard keyboard-interrupt poller.
-Works transparently on Windows and Posix (Linux, Mac OS X).  Doesn't work
-with IDLE.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as 
-published by the Free Software Foundation, either version 3 of the 
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-'''
-
-import os
-
-# Windows
-if os.name == 'nt':
-    import msvcrt
-
-# Posix (Linux, OS X)
-else:
-    import sys
-    import termios
-    import atexit
-    from select import select
-
-
-class KBHit:
-    
-    def __init__(self):
-        '''Creates a KBHit object that you can call to do various keyboard things.
-        '''
-
-        if os.name == 'nt':
-            pass
-        
-        else:
-    
-            # Save the terminal settings
-            self.fd = sys.stdin.fileno()
-            self.new_term = termios.tcgetattr(self.fd)
-            self.old_term = termios.tcgetattr(self.fd)
-    
-            # New terminal setting unbuffered
-            self.new_term[3] = (self.new_term[3] & ~termios.ICANON & ~termios.ECHO)
-            termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.new_term)
-    
-            # Support normal-terminal reset at exit
-            atexit.register(self.set_normal_term)
-    
-    
-    def set_normal_term(self):
-        ''' Resets to normal terminal.  On Windows this is a no-op.
-        '''
-        
-        if os.name == 'nt':
-            pass
-        
-        else:
-            termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.old_term)
-
-
-    def getch(self):
-        ''' Returns a keyboard character after kbhit() has been called.
-            Should not be called in the same program as getarrow().
-        '''
-        
-        s = ''
-        
-        if os.name == 'nt':
-            return msvcrt.getch().decode('utf-8')
-        
-        else:
-            return sys.stdin.read(1)
-                        
-
-    def getarrow(self):
-        ''' Returns an arrow-key code after kbhit() has been called. Codes are
-        0 : up
-        1 : right
-        2 : down
-        3 : left
-        Should not be called in the same program as getch().
-        '''
-        
-        if os.name == 'nt':
-            msvcrt.getch() # skip 0xE0
-            c = msvcrt.getch()
-            vals = [72, 77, 80, 75]
-            
-        else:
-            c = sys.stdin.read(3)[2]
-            vals = [65, 67, 66, 68]
-        
-        return vals.index(ord(c.decode('utf-8')))
-        
-
-    def kbhit(self):
-        ''' Returns True if keyboard character was hit, False otherwise.
-        '''
-        if os.name == 'nt':
-            return msvcrt.kbhit()
-        
-        else:
-            dr,dw,de = select([sys.stdin], [], [], 0)
-            return dr != []
-    
-    
-# Test    
-if __name__ == "__main__":
-    
-    kb = KBHit()
-
-    print('Hit any key, or ESC to exit')
-
-    while True:
-
-        if kb.kbhit():
-            c = kb.getch()
-            if ord(c) == 27: # ESC
-                break
-            print(c)
-             
-    kb.set_normal_term()
-        
-
+            try:
+                self.write_queue.put_nowait(value)
+                self.rw_event.set()
+            except queue.Full:
+                pass
