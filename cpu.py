@@ -1,6 +1,5 @@
 from typing import Any
 import addrspace
-import memory
 import decoder
 import util
 import logging
@@ -37,7 +36,10 @@ class CPU:
     XMASK = 0xFFFFFFFF
     TIMEBASE_FREQ = 1000000
 
-    def __init__(self, _addrspace:addrspace.AddrSpace) -> None:
+    MTIME_OFFSET = 0xbff8
+    MTIMECMP_OFFSET = 0x4000
+
+    def __init__(self, _addrspace:addrspace.AddrSpace, clint_base) -> None:
         self.regs = REGS()
         self.csr = CSR(self)
         self._addrspace_nommu = _addrspace
@@ -46,6 +48,7 @@ class CPU:
         self.mode = MODE_M
         self._start_time = time.monotonic_ns()
         self.inst_cache = collections.defaultdict(dict)    # {ppn, {vaddr:inst}}
+        self.clint_base = clint_base
 
 
     def _go_mtrap(self, mcause, mtval=0):
@@ -130,11 +133,11 @@ class CPU:
             if self.skip_step>2048:
                 # mtime
                 cur_time = int((time.monotonic_ns() - self._start_time) * 1E-9 * CPU.TIMEBASE_FREQ * 0.1)   # *0.1 May because the emulator run too slow
-                self._addrspace_nommu.u64[memory.MTIME_BASE] = cur_time
+                self._addrspace_nommu.u64[self.clint_base + CPU.MTIME_OFFSET] = cur_time
                 self.csr.time = cur_time & 0xFFFFFFFF
                 self.csr.timeh = cur_time>>32
                 self.skip_step = 0
-                mtime_pend = 1 if cur_time >= self._addrspace_nommu.u64[memory.MTIMECMP_BASE] else 0
+                mtime_pend = 1 if cur_time >= self._addrspace_nommu.u64[self.clint_base + CPU.MTIMECMP_OFFSET] else 0
                 self.csr.mip.MTIP = mtime_pend
 
                 # check interrupt
