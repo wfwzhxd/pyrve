@@ -152,7 +152,7 @@ def bit_container(cls_name, bitmap):
     '''
 
     def init(self, v=None):
-        if v:
+        if v != None:
             self._value = v
         else:
             for name in self._bitmap.keys():
@@ -186,3 +186,16 @@ def bit_container(cls_name, bitmap):
             ns[name] = property(fget=_bitcut, fset=_bitput)
 
     return type(cls_name, (object,), ns)
+
+
+def calc_speed(_cpu, step=1E6):
+    import timeit
+    return step/timeit.timeit("_cpu.run({})".format(step), number=1, globals=locals())
+
+def load_binary(fname):
+    with open(fname, 'rb') as f:
+        return f.read()
+
+def run_forever(_cpu):
+    while True:
+        _cpu.run(1E9)

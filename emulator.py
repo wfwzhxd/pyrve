@@ -2,6 +2,7 @@
 import addrspace
 import peripheral
 import cpu
+import util
 import threading
 
 #           (base, size, name)
@@ -20,11 +21,6 @@ class Memory(addrspace.BufferAddrSpace):
         self.sub_space.append(peripheral.UART_8250(UART0[0]))
 
 
-def load_binary(fname):
-    with open(fname, 'rb') as f:
-        return f.read()
-
-
 class Emulator:
 
     def __init__(self) -> None:
@@ -34,8 +30,8 @@ class Emulator:
         self.running = False
 
     def load_linux(self, kernel, rootfs):
-        self.memory.write(PHYMEM[0], load_binary(kernel))
-        self.memory.write(FLASH[0], load_binary(rootfs))
+        self.memory.write(PHYMEM[0], util.load_binary(kernel))
+        self.memory.write(FLASH[0], util.load_binary(rootfs))
 
     def run(self):
         if self.running:
