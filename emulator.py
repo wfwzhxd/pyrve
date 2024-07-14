@@ -4,6 +4,9 @@ import peripheral
 import cpu
 import util
 import threading
+import sys
+import pathlib
+
 
 #           (base, size, name)
 PHYMEM =    (0x80000000, 0x04000000, 'phy_mem')    # 64MB
@@ -33,7 +36,7 @@ class Emulator:
         self.memory.write(PHYMEM[0], util.load_binary(kernel))
         self.memory.write(FLASH[0], util.load_binary(rootfs))
 
-    def run(self):
+    def start(self):
         if self.running:
             return
         self.running = True
@@ -49,12 +52,16 @@ class Emulator:
 
 
 def main():
-    kernel = '/home/hu2/opensbi/build/platform/pyrve/firmware/fw_payload.bin'
-    rootfs = '/media/hu2/deepin/buildroot-2024.02.3/output/images/rootfs.ext2'
+    pwd = pathlib.Path(__file__).parent
+    kernel = pathlib.Path(pwd, 'images/kernel_sbi.bin')
+    rootfs = pathlib.Path(pwd, 'images/rootfs.ext2')
     rve = Emulator()
     rve.load_linux(kernel, rootfs)
-    import IPython
-    IPython.embed()
+    if len(sys.argv) == 1:  # no arg
+        util.run_forever(rve._cpu)
+    else:
+        import IPython
+        IPython.embed()
 
 
 if __name__ == '__main__':
