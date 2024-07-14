@@ -7,7 +7,7 @@
 	model = "riscv-minimal-mmu,qemu";
 
 	chosen {
-		bootargs = "earlycon=sbi console=hvc0";
+		bootargs = "earlycon=sbi console=hvc0 root=/dev/mtdblock0";
     };
 
 
@@ -56,6 +56,12 @@
 		#size-cells = <0x02>;
 		compatible = "simple-bus";
 		ranges;
+
+		flash@20000000 {
+			bank-width = <0x04>;
+			reg = <0x00 0x20000000 0x00 0x4000000>;
+			compatible = "mtd-ram";
+		};
 
 		uart@10000000 {
 			clock-frequency = <0x1000000>;
