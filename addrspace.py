@@ -1,5 +1,3 @@
-import collections
-import functools
 import logging
 import util
 
@@ -56,13 +54,12 @@ class InvalidAddress(Exception):
 
 class AddrSpace:
 
-    def __init__(self, start, end, name=None, init_mem=False) -> None:
+    def __init__(self, base, size, name=None, init_mem=False) -> None:
         self.logger = logging.getLogger(name if name else self.__class__.__name__)
         self.name = name
-        self.start, self.end = start, end
-        self.sub_space = []
+        self.base, self.end = base, base + size - 1
         if init_mem:
-            self.mem = memoryview(bytearray(end-start+1))
+            self.mem = memoryview(bytearray(size))
         else:
             self.mem = None
         self.reserve = {}
@@ -76,7 +73,7 @@ class AddrSpace:
         self.u64 = ByteWrap(False, 8, self)
 
     def contain(self, addr):
-        return addr >= self.start and addr <= self.end
+        return addr >= self.base and addr <= self.end
 
     def read(self, addr, length):
         raise NotImplementedError()
@@ -85,7 +82,7 @@ class AddrSpace:
         raise NotImplementedError()
 
     def __repr__(self) -> str:
-        #return "{}(name:{}, start:{}, end:{}, sub_space:{})".format(self.__class__.__name__, self.name, self.start, self.end, self.sub_space)
+        #return "{}(name:{}, base:{}, end:{}, sub_space:{})".format(self.__class__.__name__, self.name, self.base, self.end, self.sub_space)
         d = dict(self.__dict__)
         del d['mem']
         return "{}[{}]".format(self.__class__.__name__, repr(d))
@@ -93,75 +90,55 @@ class AddrSpace:
 
 class BufferAddrSpace(AddrSpace):
 
-    @functools.lru_cache(maxsize=32*1024)
-    def _get_space_for_rw(self, addr):
+    def __init__(self, base, size, name=None, init_mem=False) -> None:
+        super().__init__(base, size, name, init_mem)
+        self.sub_space = []
+
+    def read(self, addr, length):
         if self.contain(addr):
             for sub in self.sub_space:
                 if sub.contain(addr):
-                    return sub
+                    return sub.read(addr, length)
             if self.mem:
-                return self
-        raise InvalidAddress("{} addr:{}".format(self.name, hex(addr)))
-
-    def read(self, addr, length):
-        _start, _end = addr, addr+length-1
-        space = self._get_space_for_rw(_start)
-        if space != self:
-            return space.read(addr, length)
-        else:
-            if _end <= self.end:
-                result = self.mem[_start-self.start: _end-self.start+1]
-                self.logger.debug("read addr {}: {}".format(hex(addr), result))
-                return result
-            else:
-                raise InvalidAddress("{} read addr {}, len {}".format(self.name, hex(addr), length))
+                offset = addr - self.base
+                return self.mem[offset: offset + length]
+        raise InvalidAddress("{} unhandled read at {}".format(self.name, hex(addr)))
 
     def write(self, addr, data):
-        _start, _end = addr, addr+len(data)-1
-        space = self._get_space_for_rw(_start)
-        if space != self:
-            space.write(addr, data)
-        else:
-            if _end <= self.end:
-                self.logger.debug("write addr {}: {}".format(hex(addr), data))
-                space.mem[_start-self.start: _end-self.start+1] = data
-            else:
-                raise InvalidAddress("{} write {}, len {}".format(self.name, hex(addr), len(data)))
+        if self.contain(addr):
+            for sub in self.sub_space:
+                if sub.contain(addr):
+                    sub.write(addr, data)
+                    return
+            if self.mem:
+                offset = addr - self.base
+                self.mem[offset: offset + len(data)] = data
+                return
+        raise InvalidAddress("{} unhandled write at {}".format(self.name, hex(addr)))
 
 
 class ByteAddrSpace(AddrSpace):
-
-    @functools.lru_cache(maxsize=32*1024)
-    def _get_space_for_rw(self, addr):
-        if self.contain(addr):
-            for sub in self.sub_space:
-                if sub.contain(addr):
-                    return ByteAddrSpace._get_space_for_rw(sub, addr)
-            return self
-        raise InvalidAddress("{} addr:{}".format(self.name, hex(addr)))
 
     def read(self, addr, length):
         result = bytearray(length)
         for idx in range(length):
             _addr = addr + idx
-            result[idx] = self._get_space_for_rw(_addr).read_byte(_addr)
-        self.logger.debug("read addr {}: {}".format(hex(addr), result))
+            result[idx] = self.read_byte(_addr)
         return result
 
     def write(self, addr, data):
-        self.logger.debug("write addr {}: {}".format(hex(addr), data))
         for idx in range(len(data)):
             _addr = addr + idx
-            self._get_space_for_rw(_addr).write_byte(_addr, data[idx])
+            self.write_byte(_addr, data[idx])
 
     def read_byte(self, addr):
         if self.mem:
-            return self.mem[addr-self.start]
+            return self.mem[addr-self.base]
         else:
-            raise InvalidAddress("{} read addr:{}".format(self.name, hex(addr)))
+            raise InvalidAddress("{} unhandled read at {}".format(self.name, hex(addr)))
 
     def write_byte(self, addr, value):
         if self.mem:
-            self.mem[addr-self.start] = value&0xFF
+            self.mem[addr-self.base] = value&0xFF
         else:
-            raise InvalidAddress("{} write addr:{}".format(self.name, hex(addr)))
+            raise InvalidAddress("{} unhandled write at {}".format(self.name, hex(addr)))
