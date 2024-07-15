@@ -132,7 +132,7 @@ class CPU:
 
             if self.skip_step>2048:
                 # mtime
-                cur_time = int((time.monotonic_ns() - self._start_time) * 1E-9 * CPU.TIMEBASE_FREQ * 0.1)   # *0.1 May because the emulator run too slow
+                cur_time = int((time.monotonic_ns() - self._start_time) * 1E-9 * CPU.TIMEBASE_FREQ)
                 self._addrspace_nommu.u64[self.clint_base + CPU.MTIME_OFFSET] = cur_time
                 self.csr.time = cur_time & 0xFFFFFFFF
                 self.csr.timeh = cur_time>>32
