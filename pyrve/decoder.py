@@ -1,5 +1,6 @@
-from . import util
 import logging
+
+from . import util
 
 logger = logging.getLogger(__name__)
 

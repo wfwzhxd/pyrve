@@ -1,6 +1,6 @@
-from . import util
-from . import cpu
 import math
+
+from . import cpu, util
 
 bitcut = util.bitcut
 ru = lambda v: v & 0xFFFFFFFF  # reg value to unsigned

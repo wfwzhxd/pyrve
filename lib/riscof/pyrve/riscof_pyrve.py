@@ -1,16 +1,16 @@
-import os
-import re
-import shutil
-import subprocess
-import shlex
 import logging
+import os
 import random
+import re
+import shlex
+import shutil
 import string
-from string import Template
+import subprocess
 import sys
+from string import Template
 
-import riscof.utils as utils
 import riscof.constants as constants
+import riscof.utils as utils
 from riscof.pluginTemplate import pluginTemplate
 
 logger = logging.getLogger()

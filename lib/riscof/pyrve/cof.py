@@ -1,8 +1,9 @@
-import pyrve.cpu as cpu
-import pyrve.addrspace as addrspace
-import pyrve.util as util
 import logging
 import sys
+
+import pyrve.addrspace as addrspace
+import pyrve.cpu as cpu
+import pyrve.util as util
 
 logging.basicConfig(
     level=logging.DEBUG,

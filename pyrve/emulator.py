@@ -1,11 +1,8 @@
-from . import addrspace
-from . import peripheral
-from . import cpu
-from . import util
-import threading
-import sys
 import pathlib
+import sys
+import threading
 
+from . import addrspace, cpu, peripheral, util
 
 #           (base, size, name)
 PHYMEM = (0x80000000, 0x04000000, "phy_mem")  # 64MB

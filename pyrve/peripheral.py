@@ -1,9 +1,10 @@
-from . import addrspace
 import logging
 import queue
-import threading
-import socketserver
 import socket
+import socketserver
+import threading
+
+from . import addrspace
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,5 @@
-from typing import Any
 import functools
+from typing import Any
 
 WV = [(2 << w) - 1 for w in range(32)]
 

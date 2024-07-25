@@ -1,10 +1,8 @@
-from . import addrspace
-from . import decoder
-from . import util
-import logging
 import collections
+import logging
 import time
 
+from . import addrspace, decoder, util
 
 logger = logging.getLogger(__name__)
 
