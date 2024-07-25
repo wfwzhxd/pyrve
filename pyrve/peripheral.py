@@ -7,16 +7,21 @@ import socket
 
 logger = logging.getLogger(__name__)
 
+
 class UART_8250(addrspace.ByteAddrSpace):
 
     BUFFER_SIZE = 10 * 1024
 
-    def __init__(self, base, host='127.0.0.1', port=8250) -> None:
-        super().__init__(base, 0x100, 'uart_8250@{}[({}, {})]'.format(hex(base), host, port), False)
+    def __init__(self, base, host="127.0.0.1", port=8250) -> None:
+        super().__init__(
+            base, 0x100, "uart_8250@{}[({}, {})]".format(hex(base), host, port), False
+        )
         self.read_queue = queue.Queue(UART_8250.BUFFER_SIZE)
         self.write_queue = queue.Queue(UART_8250.BUFFER_SIZE)
         self.rw_event = threading.Event()
-        self.server = socketserver.ThreadingTCPServer((host, port), self._socket_handler, bind_and_activate=False)
+        self.server = socketserver.ThreadingTCPServer(
+            (host, port), self._socket_handler, bind_and_activate=False
+        )
         self.server.allow_reuse_address = True
         self.server.allow_reuse_port = True
         self.server.server_bind()
@@ -24,7 +29,7 @@ class UART_8250(addrspace.ByteAddrSpace):
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.client_id = 0
 
-    def _socket_handler(self, request:socket.socket, client_address, server):
+    def _socket_handler(self, request: socket.socket, client_address, server):
         self.client_id += 1
         my_client_id = self.client_id
         request.settimeout(0.01)
@@ -57,7 +62,7 @@ class UART_8250(addrspace.ByteAddrSpace):
         self.rw_event.set()
         result = 0
         if 0x10000005 == addr:
-             result = 0x60 | (1 if self.read_queue.qsize() != 0 else 0)
+            result = 0x60 | (1 if self.read_queue.qsize() != 0 else 0)
         if 0x10000000 == addr and self.read_queue.qsize() != 0:
             try:
                 result = self.read_queue.get_nowait()

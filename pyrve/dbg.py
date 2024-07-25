@@ -1,8 +1,9 @@
 from . import cpu
 
+
 class Dbg:
 
-    def __init__(self, _cpu:cpu.CPU) -> None:
+    def __init__(self, _cpu: cpu.CPU) -> None:
         self.breaks = []
         self._cpu = _cpu
 
@@ -22,18 +23,21 @@ class TestFunc:
 
     @staticmethod
     def pc(addr):
-        def _wrap(_cpu:cpu.CPU):
+        def _wrap(_cpu: cpu.CPU):
             return addr == _cpu.regs.pc
+
         return _wrap
-    
+
     def mem(addr, data):
-        def _wrap(_cpu:cpu.CPU):
+        def _wrap(_cpu: cpu.CPU):
             return data == _cpu._addrspace.read(addr, len(data))
+
         return _wrap
-    
+
     def backtrace(pc_array):
-        def _wrap(_cpu:cpu.CPU):
+        def _wrap(_cpu: cpu.CPU):
             if len(pc_array) == 0 or pc_array[-1] + 4 != _cpu.regs.pc:
-                    pc_array.append(_cpu.regs.pc)
+                pc_array.append(_cpu.regs.pc)
             return False
+
         return _wrap

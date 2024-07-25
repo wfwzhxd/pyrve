@@ -5,16 +5,18 @@ logger = logging.getLogger(__name__)
 
 inst_cache = dict()
 
+
 def decode(inst_value):
     r = inst_cache.get(inst_value)
     if r:
         return r
     from . import inst
+
     t = inst.InstFormat(inst_value)
     inst_class = None
-    if 0b0110011 == t.opcode:   
+    if 0b0110011 == t.opcode:
         # Base Reg
-        if 0x1 == t.funct7: # MUL/DIV
+        if 0x1 == t.funct7:  # MUL/DIV
             if 0x0 == t.funct3:
                 inst_class = inst.MUL
             elif 0x1 == t.funct3:
@@ -84,7 +86,7 @@ def decode(inst_value):
             inst_class = inst.SLTIU
         else:
             pass
-    elif 0b0000011 == t.opcode: # Load
+    elif 0b0000011 == t.opcode:  # Load
         if 0x0 == t.funct3:
             inst_class = inst.LB
         elif 0x1 == t.funct3:
@@ -97,7 +99,7 @@ def decode(inst_value):
             inst_class = inst.LHU
         else:
             pass
-    elif 0b0100011 == t.opcode: # Store
+    elif 0b0100011 == t.opcode:  # Store
         if 0x0 == t.funct3:
             inst_class = inst.SB
         elif 0x1 == t.funct3:
@@ -106,7 +108,7 @@ def decode(inst_value):
             inst_class = inst.SW
         else:
             pass
-    elif 0b1100011 == t.opcode: # Branch
+    elif 0b1100011 == t.opcode:  # Branch
         if 0x0 == t.funct3:
             inst_class = inst.BEQ
         elif 0x1 == t.funct3:
@@ -121,16 +123,16 @@ def decode(inst_value):
             inst_class = inst.BGEU
         else:
             pass
-    elif 0b1101111 == t.opcode: # Jal
+    elif 0b1101111 == t.opcode:  # Jal
         inst_class = inst.JAL
-    elif 0b1100111 == t.opcode: # Jalr
+    elif 0b1100111 == t.opcode:  # Jalr
         if 0x0 == t.funct3:
             inst_class = inst.JALR
-    elif 0b0110111 == t.opcode: # Lui
+    elif 0b0110111 == t.opcode:  # Lui
         inst_class = inst.LUI
-    elif 0b0010111 == t.opcode: # Auipc
+    elif 0b0010111 == t.opcode:  # Auipc
         inst_class = inst.AUIPC
-    elif 0b1110011 == t.opcode: # System
+    elif 0b1110011 == t.opcode:  # System
         t = inst.Format_UI(inst_value)
         if 0x0 == t.funct3:
             if 0x0 == t.imm:
@@ -160,16 +162,16 @@ def decode(inst_value):
             inst_class = inst.CSRRCI
         else:
             pass
-    elif 0b0001111 == t.opcode: # Fence
+    elif 0b0001111 == t.opcode:  # Fence
         t = inst.Format_I(inst_value)
         if 0 == t.funct3:
             inst_class = inst.FENCE
         if 1 == t.funct3:
-            inst_class = inst.FENCE # fenci.i, current not use
-        elif 2 == t.funct3: # CBO
+            inst_class = inst.FENCE  # fenci.i, current not use
+        elif 2 == t.funct3:  # CBO
             if 4 == t.imm:
                 inst_class = inst.CBOzero
-    elif 0b0101111 == t.opcode:   # Atomic
+    elif 0b0101111 == t.opcode:  # Atomic
         t = inst.FORMAT_ATOMIC(inst_value)
         if 0x2 == t.funct3:
             if 0x02 == t.funct5:

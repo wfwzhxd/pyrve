@@ -5,33 +5,33 @@ from . import util
 class ByteWrap:
 
     SIGN_LEN_FUNC_READ_MAP = {
-        True:{
-            1:util.LittleEndness.read8s,
-            2:util.LittleEndness.read16s,
-            4:util.LittleEndness.read32s,
-            8:util.LittleEndness.read64s
+        True: {
+            1: util.LittleEndness.read8s,
+            2: util.LittleEndness.read16s,
+            4: util.LittleEndness.read32s,
+            8: util.LittleEndness.read64s,
         },
-        False:{
-            1:util.LittleEndness.read8u,
-            2:util.LittleEndness.read16u,
-            4:util.LittleEndness.read32u,
-            8:util.LittleEndness.read64u
-        }
+        False: {
+            1: util.LittleEndness.read8u,
+            2: util.LittleEndness.read16u,
+            4: util.LittleEndness.read32u,
+            8: util.LittleEndness.read64u,
+        },
     }
 
     SIGN_LEN_FUNC_WRITE_MAP = {
-        True:{
-            1:util.LittleEndness.write8s,
-            2:util.LittleEndness.write16s,
-            4:util.LittleEndness.write32s,
-            8:util.LittleEndness.write64s
+        True: {
+            1: util.LittleEndness.write8s,
+            2: util.LittleEndness.write16s,
+            4: util.LittleEndness.write32s,
+            8: util.LittleEndness.write64s,
         },
-        False:{
-            1:util.LittleEndness.write8u,
-            2:util.LittleEndness.write16u,
-            4:util.LittleEndness.write32u,
-            8:util.LittleEndness.write64u
-        }
+        False: {
+            1: util.LittleEndness.write8u,
+            2: util.LittleEndness.write16u,
+            4: util.LittleEndness.write32u,
+            8: util.LittleEndness.write64u,
+        },
     }
 
     def __init__(self, signed, byte_len, _addrspace) -> None:
@@ -82,9 +82,9 @@ class AddrSpace:
         raise NotImplementedError()
 
     def __repr__(self) -> str:
-        #return "{}(name:{}, base:{}, end:{}, sub_space:{})".format(self.__class__.__name__, self.name, self.base, self.end, self.sub_space)
+        # return "{}(name:{}, base:{}, end:{}, sub_space:{})".format(self.__class__.__name__, self.name, self.base, self.end, self.sub_space)
         d = dict(self.__dict__)
-        del d['mem']
+        del d["mem"]
         return "{}[{}]".format(self.__class__.__name__, repr(d))
 
 
@@ -100,7 +100,7 @@ class BufferAddrSpace(AddrSpace):
                 return sub.read(addr, length)
         if self.mem:
             offset = addr - self.base
-            return self.mem[offset: offset + length]
+            return self.mem[offset : offset + length]
         raise InvalidAddress("{} unhandled read at {}".format(self.name, hex(addr)))
 
     def write(self, addr, data):
@@ -110,7 +110,7 @@ class BufferAddrSpace(AddrSpace):
                 return
         if self.mem:
             offset = addr - self.base
-            self.mem[offset: offset + len(data)] = data
+            self.mem[offset : offset + len(data)] = data
             return
         raise InvalidAddress("{} unhandled write at {}".format(self.name, hex(addr)))
 
@@ -131,12 +131,14 @@ class ByteAddrSpace(AddrSpace):
 
     def read_byte(self, addr):
         if self.mem:
-            return self.mem[addr-self.base]
+            return self.mem[addr - self.base]
         else:
             raise InvalidAddress("{} unhandled read at {}".format(self.name, hex(addr)))
 
     def write_byte(self, addr, value):
         if self.mem:
-            self.mem[addr-self.base] = value&0xFF
+            self.mem[addr - self.base] = value & 0xFF
         else:
-            raise InvalidAddress("{} unhandled write at {}".format(self.name, hex(addr)))
+            raise InvalidAddress(
+                "{} unhandled write at {}".format(self.name, hex(addr))
+            )
