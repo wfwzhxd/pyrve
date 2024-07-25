@@ -2,7 +2,7 @@ from . import util
 from . import cpu
 import math
 
-bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
+bitcut = util.bitcut
 ru = lambda v:v&0xFFFFFFFF      # reg value to unsigned
 
 class InstFormat:
@@ -23,6 +23,8 @@ class InstFormat:
     def __repr__(self) -> str:
         return '{}[value:{:#x}, opcode:{:b}, funct3:{:#x}, funct7:{:#x}, rs1:{}, rs2:{}, rd:{}, imm:{}]'.format(self.__class__.__name__, self.value, self.opcode, self.funct3, self.funct7, self.rs1, self.rs2, self.rd, hex(self.imm) if self.imm != None else None)
 
+class MayJumpInst:
+    pass
 
 class Format_R(InstFormat):
     pass
@@ -50,7 +52,7 @@ class Format_U(InstFormat):
         r = bitcut(self.value, 12, 31)
         self.imm = util.msb_extend(r, 20, 32)
 
-class Format_B(InstFormat):
+class Format_B(InstFormat, MayJumpInst):
 
     def __init__(self, value) -> None:
         super().__init__(value)
@@ -59,7 +61,7 @@ class Format_B(InstFormat):
         r = (bitcut(self.value, 31, 31)<<12) | (bitcut(self.value, 7, 7)<<11) | high | low
         self.imm = util.msb_extend(r, 13, 32)
 
-class Format_J(InstFormat):
+class Format_J(InstFormat, MayJumpInst):
 
     def __init__(self, value) -> None:
         super().__init__(value)
@@ -179,7 +181,7 @@ class SLTI(Format_I):
 class SLTIU(Format_I):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs[self.rd] = 1 if _cpu.regs[self.rs1]<ru(self.imm) else 0
+        _cpu.regs[self.rd] = 1 if _cpu.regs[self.rs1]<self.imm&0xFFFFFFFF else 0
 
 # Load Store:
 
@@ -229,52 +231,52 @@ class BEQ(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
         if _cpu.regs[self.rs1] == _cpu.regs[self.rs2]:
-            _cpu.regs.pc += self.imm
+            _cpu.pc += self.imm
 
 class BNE(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
         if _cpu.regs[self.rs1] != _cpu.regs[self.rs2]:
-            _cpu.regs.pc += self.imm
+            _cpu.pc += self.imm
 
 class BLT(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
         if util.u2s(_cpu.regs[self.rs1], 32) < util.u2s(_cpu.regs[self.rs2], 32):
-            _cpu.regs.pc += self.imm
+            _cpu.pc += self.imm
 
 class BGE(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
         if util.u2s(_cpu.regs[self.rs1], 32) >= util.u2s(_cpu.regs[self.rs2], 32):
-            _cpu.regs.pc += self.imm
+            _cpu.pc += self.imm
 
 class BLTU(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
         if (_cpu.regs[self.rs1] < _cpu.regs[self.rs2]):
-            _cpu.regs.pc += self.imm
+            _cpu.pc += self.imm
 
 class BGEU(Format_B):
 
     def exec(self, _cpu: cpu.CPU):
         if (_cpu.regs[self.rs1] >= _cpu.regs[self.rs2]):
-            _cpu.regs.pc += self.imm
+            _cpu.pc += self.imm
 
 # Jump:
 
 class JAL(Format_J):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs[self.rd] = _cpu.regs.pc + 4
-        _cpu.regs.pc += self.imm
+        _cpu.regs[self.rd] = _cpu.pc + 4
+        _cpu.pc += self.imm
 
 
-class JALR(Format_I):
+class JALR(Format_I, MayJumpInst):
 
     def exec(self, _cpu: cpu.CPU):
-        old_pc = _cpu.regs.pc
-        _cpu.regs.pc = (_cpu.regs[self.rs1] + self.imm)&0xFFFFFFFE
+        old_pc = _cpu.pc
+        _cpu.pc = (_cpu.regs[self.rs1] + self.imm)&0xFFFFFFFE
         _cpu.regs[self.rd] = old_pc + 4
 
 
@@ -288,7 +290,7 @@ class LUI(Format_U):
 class AUIPC(Format_U):
 
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs[self.rd] = _cpu.regs.pc + (self.imm<<12)
+        _cpu.regs[self.rd] = _cpu.pc + (self.imm<<12)
 
 # Environment
 
@@ -298,7 +300,7 @@ class Format_UI(Format_I):
         super().__init__(value)
         self.imm &= 0xFFF
 
-class ECALL(Format_UI):
+class ECALL(Format_UI, MayJumpInst):
     
     def exec(self, _cpu: cpu.CPU):
         if cpu.MODE_M == _cpu.mode:
@@ -314,31 +316,31 @@ class ECALL(Format_UI):
 class EBREAK(Format_UI):
     pass
 
-class MRET(Format_UI):
+class MRET(Format_UI, MayJumpInst):
     
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.pc = _cpu.csr.mepc
+        _cpu.pc = _cpu.csr.mepc
         _cpu.csr.mstatus.MIE = _cpu.csr.mstatus.MPIE
         _cpu.csr.mstatus.MPIE = 1
         _cpu.mode = _cpu.csr.mstatus.MPP
         _cpu.csr.mstatus.MPP = 0    #?
 
-class SRET(Format_UI):
+class SRET(Format_UI, MayJumpInst):
     
     def exec(self, _cpu: cpu.CPU):
-        _cpu.regs.pc = _cpu.csr.sepc
+        _cpu.pc = _cpu.csr.sepc
         _cpu.csr.sstatus.SIE = _cpu.csr.sstatus.SPIE
         _cpu.csr.sstatus.SPIE = 1
         _cpu.mode = _cpu.csr.sstatus.SPP
         _cpu.csr.sstatus.SPP = 0    #?
 
-class SFENCEvma(Format_R):
+class SFENCEvma(Format_R, MayJumpInst):
 
     def exec(self, _cpu: cpu.CPU):
-        if self.rs2 and _cpu.regs[self.rs2] in _cpu._addrspace.cache:
-            _cpu._addrspace.cache[_cpu.regs[self.rs2]].clear()
+        if self.rs2 and _cpu.regs[self.rs2] in _cpu._addrspace.pte_cache:
+            _cpu._addrspace.pte_cache[_cpu.regs[self.rs2]].clear()
         else:
-            _cpu._addrspace.cache.clear()
+            _cpu._addrspace.pte_cache.clear()
 
 class WFI(Format_UI):
 
@@ -348,7 +350,7 @@ class WFI(Format_UI):
 
 # CSR
 
-class CSRRW(Format_UI):
+class CSRRW(Format_UI, MayJumpInst):
 
     def exec(self, _cpu: cpu.CPU):
         rs1 = _cpu.regs[self.rs1]
@@ -356,7 +358,7 @@ class CSRRW(Format_UI):
             _cpu.regs[self.rd] = _cpu.csr[self.imm]
         _cpu.csr[self.imm] = rs1
 
-class CSRRS(Format_UI):
+class CSRRS(Format_UI, MayJumpInst):
 
     def exec(self, _cpu: cpu.CPU):
         rs1 = _cpu.regs[self.rs1]
@@ -364,7 +366,7 @@ class CSRRS(Format_UI):
         if rs1:
             _cpu.csr[self.imm] |= rs1
 
-class CSRRC(Format_UI):
+class CSRRC(Format_UI, MayJumpInst):
     
     def exec(self, _cpu: cpu.CPU):
         rs1 = _cpu.regs[self.rs1]
@@ -372,21 +374,21 @@ class CSRRC(Format_UI):
         if rs1:
             _cpu.csr[self.imm] &= ~rs1
 
-class CSRRWI(Format_UI):
+class CSRRWI(Format_UI, MayJumpInst):
     
     def exec(self, _cpu: cpu.CPU):
         if self.rd:
             _cpu.regs[self.rd] = _cpu.csr[self.imm]
         _cpu.csr[self.imm] = self.rs1
 
-class CSRRSI(Format_UI):
+class CSRRSI(Format_UI, MayJumpInst):
     
     def exec(self, _cpu: cpu.CPU):
         _cpu.regs[self.rd] = _cpu.csr[self.imm]
         if self.rs1:
             _cpu.csr[self.imm] |= self.rs1
 
-class CSRRCI(Format_UI):
+class CSRRCI(Format_UI, MayJumpInst):
     
     def exec(self, _cpu: cpu.CPU):
         _cpu.regs[self.rd] = _cpu.csr[self.imm]
@@ -440,7 +442,7 @@ class FORMAT_AMO(FORMAT_ATOMIC):
         rs2_value = _cpu.regs[self.rs2]
         # op
         mem_value, rd_value = self.get_memvalue_rdvalue(mem_value, rs2_value)
-        logging.debug(_cpu.regs)
+        # logging.debug(_cpu.regs)
         # logging.debug("get_memvalue_rdvalue return {}".format(hex(value)))
         # store
         _cpu.regs[self.rd] = rd_value

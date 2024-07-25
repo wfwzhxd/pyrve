@@ -40,6 +40,8 @@ class CPU:
     MTIMECMP_OFFSET = 0x4000
 
     def __init__(self, _addrspace:addrspace.AddrSpace, clint_base) -> None:
+        self.pc = 0
+        self._csr_satp_changed = True
         self.regs = REGS()
         self.csr = CSR(self)
         self._addrspace_nommu = _addrspace
@@ -47,31 +49,30 @@ class CPU:
         self.skip_step = 0
         self.mode = MODE_M
         self._start_time = time.monotonic_ns()
-        self.inst_cache = collections.defaultdict(dict)    # {ppn, {vaddr:inst}}
+        self.inst_cache = collections.defaultdict(dict)    # {ppn, {paddr:inst}}
         self.clint_base = clint_base
-
 
     def _go_mtrap(self, mcause, mtval=0):
         logger.debug("go_mtrap, mode: {}, mcause {}".format(bin(self.mode), hex(mcause)))
         self.csr.mcause = mcause
-        self.csr.mepc = self.regs.pc
+        self.csr.mepc = self.pc
         self.csr.mstatus.MPIE = self.csr.mstatus.MIE
         self.csr.mstatus.MIE = 0
         self.csr.mstatus.MPP = self.mode
         self.mode = MODE_M
         self.csr.mtval = mtval
-        self.regs.pc = self.csr.mtvec&0xFFFFFFFC  # Only Direct Mode
+        self.pc = self.csr.mtvec&0xFFFFFFFC  # Only Direct Mode
 
     def _go_strap(self, scause, stval=0):
         logger.debug("go_strap, mode: {}, scause {}".format(bin(self.mode), hex(scause)))
         self.csr.scause = scause
-        self.csr.sepc = self.regs.pc
+        self.csr.sepc = self.pc
         self.csr.sstatus.SPIE = self.csr.sstatus.SIE
         self.csr.sstatus.SIE = 0
         self.csr.sstatus.SPP = self.mode
         self.mode = MODE_S
         self.csr.stval = stval
-        self.regs.pc = self.csr.stvec&0xFFFFFFFC  # Only Direct Mode
+        self.pc = self.csr.stvec&0xFFFFFFFC  # Only Direct Mode
 
     def _go_trap(self, cause, tval=0):
         logger.debug("_go_trap, mode: {}, cause {}, tval: {}".format(bin(self.mode), hex(cause), hex(tval)))
@@ -96,28 +97,43 @@ class CPU:
 
 
     def run(self, step):
-        while(step):
-            self.skip_step += 1
-            step -= 1
-            logger.debug(self.regs)
+        from .inst import MayJumpInst
+        prev_mode = -1
+        while(step>0):
+            # logger.debug(self.regs)
             # logger.debug(self.csr)
-
+            if self._csr_satp_changed or prev_mode != self.mode:
+                self._addrspace.accel_cache.clear()
+                self._csr_satp_changed = False
+                prev_mode = self.mode
             # exec inst
-            cached_pc = self.regs.pc
+            cached_pc = self.pc
             try:
-                paddr = self._addrspace.translate_addr(cached_pc)
-                decoded_inst = self.inst_cache[paddr>>12].get(cached_pc)
-                if not decoded_inst:
-                    decoded_inst = decoder.decode(self._addrspace.u32[cached_pc])
-                    self.inst_cache[paddr>>12][cached_pc] = decoded_inst
+                paddr = self._addrspace.translate_addr_accel(2, cached_pc, fetch_inst=True)
+                insts = self.inst_cache[paddr>>12].get(paddr)
+                if not insts:
+                    pc_paddr = paddr
+                    insts = []
+                    while True:
+                        decoded_inst = decoder.decode(self._addrspace_nommu.u32[pc_paddr])
+                        insts.append(decoded_inst)
+                        pc_paddr += 4
+                        if pc_paddr^paddr > 0xFFF or isinstance(decoded_inst, MayJumpInst):
+                            break
+                        # if self._csr_satp_changed or prev_mode != self.mode:
+                        #     break
+                    self.inst_cache[paddr>>12][paddr] = insts
             except MMU.PageFaultException as e:
                 self._go_trap(EXCEPTION_INST_PAGE_FAULT, e.vaddr)
                 continue
 
-            logger.debug(decoded_inst)
-
+            # logger.debug(insts)
             try:
-                decoded_inst.exec(self)
+                for inst in insts:
+                    cached_pc = self.pc
+                    inst.exec(self)
+                    if cached_pc == self.pc:
+                        self.pc += 4  # IS THIS RIGHT?
             except GOTRAP:
                 continue
             except MMU.PageFaultException as e:
@@ -127,8 +143,11 @@ class CPU:
                     cause = EXCEPTION_STORE_AMO_PAGE_FAULT
                 self._go_trap(cause, e.vaddr)
                 continue
-            if cached_pc == self.regs.pc:
-                self.regs.pc += 4  # IS THIS RIGHT?
+
+            # step is not accurate
+            inst_cnt = len(insts)
+            self.skip_step += inst_cnt
+            step -= inst_cnt
 
             if self.skip_step>2048:
                 # mtime
@@ -149,26 +168,14 @@ class CPU:
                     if self._go_trap(INTERRUPT_TIMER_S):
                         continue
 
-class REGS(util.NamedArray):
+class REGS(list):
 
     def __init__(self) -> None:
-        super().__init__([0]*32, {'pc':0})
-
-    def __getitem__(self, key):
-        if 0 == key:
-            return 0
-        else:
-            return super().__getitem__(key)
+        super().__init__([0]*32)
 
     def __setitem__(self, key, value):
         if key:
             super().__setitem__(key, value & 0xFFFFFFFF)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if 'pc' == name:
-            self._inner_array[0] = value & 0xFFFFFFFF
-        else:
-            super().__setattr__(name, value)
 
 
 class CSR(util.NamedArray):
@@ -213,8 +220,6 @@ class CSR(util.NamedArray):
         'mhartid': 0xF14
     }
 
-    ADDRS = set(ADDR_MAP.values())
-
     MSTATUS_BITMAP = {
         'SIE': (1, 1, 0),
         'MIE': (3, 3, 0),
@@ -243,30 +248,38 @@ class CSR(util.NamedArray):
     }
 
     def __init__(self, _cpu:CPU) -> None:
-        super().__init__([0]*4096, CSR.ADDR_MAP)
+        init_array = [ 0 if idx in CSR.ADDR_MAP.values() else None for idx in range(4096)]
+        super().__init__(init_array, CSR.ADDR_MAP)
         self._cpu = _cpu
         self.mstatus = self.sstatus = util.bit_container('[m/s]status', CSR.MSTATUS_BITMAP)()
         self.mie = self.sie = util.bit_container('[m/s]ie', CSR.MIE_BITMAP)()
         self.mip = self.sip = util.bit_container('[m/s]ip', CSR.MIP_BITMAP)()
         self.satp = util.bit_container('satp', CSR.SATP_BITMAP)()
         self.misa = 0x40141101    # rv32ima S/U mode
-        self.mvendorid = 0xff0ff0ff
+        self._satp_mode = 0
+        self._satp_asid = 0
 
     def __getitem__(self, key):
-        value = int(self._inner_array[key])
-        if key not in CSR.ADDRS: 
-            self._cpu._go_trap(EXCEPTION_ILLEGAL_INSTRUCTION, self._cpu.regs.pc)
+        value = self._inner_array[key]
+        if value is None: 
+            self._cpu._go_trap(EXCEPTION_ILLEGAL_INSTRUCTION, self._cpu.pc)
             raise GOTRAP()
-        return value
+        return int(value)
     
     def __setitem__(self, key, value):
-        if key not in CSR.ADDRS: 
-            self._cpu._go_trap(EXCEPTION_ILLEGAL_INSTRUCTION, self._cpu.regs.pc)
+        value_old = self._inner_array[key]
+        if value_old is None: 
+            self._cpu._go_trap(EXCEPTION_ILLEGAL_INSTRUCTION, self._cpu.pc)
             raise GOTRAP()
-        if type(self._inner_array[key]) == int:
+        if type(value_old) == int:
             self._inner_array[key] = value
         else:   # bit_container
-            self._inner_array[key]._value = value
+            value_old._value = value
+            if 0x180 == key:    #satp
+                self._cpu._csr_satp_changed = True
+                # access ASID from satp is slow, cache it
+                self._satp_mode = self.satp.MODE
+                self._satp_asid = self.satp.ASID
 
     def __repr__(self) -> str:
         return self.__class__.__name__ + ": " + '[{}]'.format(', '.join(hex(int(x)) for x in self._inner_array))
@@ -310,18 +323,16 @@ class MMU(addrspace.AddrSpace):
         super().__init__(0, 0xFFFFFFFF, self.__class__.__name__, False)
         self._cpu = _cpu
         self._addrspace = _addrspace
-        self.cache = collections.defaultdict(dict) # {asid:{vaddr&0xFFFFF000:(pte, pte_addr, superpage)}}
-        self.cache_hit = 0
-        self.cache_mis = 0
+        self.pte_cache = collections.defaultdict(dict) # {asid:{vaddr&0xFFFFF000:(pte, pte_addr, superpage)}}
+        self.pa_cache = dict()  # {(pte, superpage, vaddr):pa}
+        self.accel_cache = dict()   # {tag:(prev_addr, prev_paddr)}
 
     def find_pte(self, addr):
-        asid = self._cpu.csr.satp.ASID
+        asid = self._cpu.csr._satp_asid
         key = addr & 0xFFFFF000
-        p =  self.cache[asid].get(key, None)
+        p =  self.pte_cache[asid].get(key, None)
         if p:
-            self.cache_hit += 1
             return p
-        self.cache_mis += 1
         result_error = (None, None, False)
         va = MMU.VA(addr)
         pte_addr = self._cpu.csr.satp.PPN * MMU.PAGE_SIZE + va.VPN1 * MMU.PTE_SIZE
@@ -338,69 +349,89 @@ class MMU(addrspace.AddrSpace):
             superpage = False
         else:
             superpage = True
+
         result_ok = (pte, pte_addr, superpage)
-        self.cache.get(asid)[key] = result_ok
+        self.pte_cache[asid][key] = result_ok
         return result_ok
 
-    def translate_addr(self, addr, write=False):
-        if MODE_M != self._cpu.mode and self._cpu.csr.satp.MODE:
+    def translate_addr(self, addr, write=False, fetch_inst=False):
+        if self._cpu.csr._satp_mode and MODE_M != self._cpu.mode:
             pte, pte_addr, superpage = self.find_pte(addr)
-            pagefault = MMU.StorePageFault(addr) if write else MMU.LoadPageFault(addr)
-            va = MMU.VA(addr)
-            if not pte:
+            
+            if not pte or (write and not pte.W):
+                pagefault = MMU.StorePageFault(addr) if write else MMU.LoadPageFault(addr)
                 raise pagefault
-            if MODE_U == self._cpu.mode and not pte.U:
-                logger.debug('PTE({}) at addr {} error: U mode without U flag'.format(pte, pte_addr))
-                raise pagefault
-            if MODE_S == self._cpu.mode and pte.U and not self._cpu.csr.sstatus.SUM:
-                logger.debug('PTE({}) at addr {} error: S mode without SUM flag'.format(pte, pte_addr))
-                raise pagefault
-            if not self._cpu.csr.sstatus.MXR and not pte.R:
-                logger.debug('PTE({}) at addr {} error: MXR=0, pte.R=0'.format(pte, pte_addr))
-                raise pagefault
-            if superpage and pte.PPN0:
-                logger.debug('PTE({}) at addr {} error: MISALIGN superpage'.format(pte, pte_addr))
-                raise pagefault
-            if not pte.W and write:
-                logger.debug('PTE({}) at addr {} error: NO write perm'.format(pte, pte_addr))
-                raise pagefault
-            if addr == self._cpu.regs.pc:
-                if not pte.X:
-                    logger.debug('PTE({}) at addr {} error: NO exec perm'.format(pte, pte_addr))
-                    raise pagefault
-            else:
-                if not pte.R:
-                    logger.debug('PTE({}) at addr {} error: NO read perm'.format(pte, pte_addr))
-                    raise pagefault
 
-            if 0 == pte.A or (0 == pte.D and write):
-                logger.debug('PTE({}) at addr {} error: A/D flag not valid, do repare'.format(pte, pte_addr))
+            #### Omit permission check, for performance ####
+            # if MODE_U == self._cpu.mode and not pte.U:
+            #     logger.debug('PTE({}) at addr {} error: U mode without U flag'.format(pte, pte_addr))
+            #     raise pagefault
+            # if MODE_S == self._cpu.mode and pte.U and not self._cpu.csr.sstatus.SUM:
+            #     logger.debug('PTE({}) at addr {} error: S mode without SUM flag'.format(pte, pte_addr))
+            #     raise pagefault
+            # if not self._cpu.csr.sstatus.MXR and not pte.R:
+            #     logger.debug('PTE({}) at addr {} error: MXR=0, pte.R=0'.format(pte, pte_addr))
+            #     raise pagefault
+            # if superpage and pte.PPN0:
+            #     logger.debug('PTE({}) at addr {} error: MISALIGN superpage'.format(pte, pte_addr))
+            #     raise pagefault
+            # if fetch_inst:
+            #     if not pte.X:
+            #         logger.debug('PTE({}) at addr {} error: NO exec perm'.format(pte, pte_addr))
+            #         raise pagefault
+            # else:
+            #     if not pte.R:
+            #         logger.debug('PTE({}) at addr {} error: NO read perm'.format(pte, pte_addr))
+            #         raise pagefault
+
+            if (write and 0 == pte.D) or 0 == pte.A:
+                # logger.debug('PTE({}) at addr {} error: A/D flag not valid, do repare'.format(pte, pte_addr))
                 pte.A = 1
                 if write:
                     pte.D = 1
-                self._addrspace.u32[pte_addr] = int(pte)
-            pa = MMU.PA()
-            pa.OFFSET = va.OFFSET
-            pa.PPN0 = va.VPN0 if superpage else pte.PPN0
-            pa.PPN1 = pte.PPN1
-            paddr = int(pa)
+                self._addrspace.u32[pte_addr] = int(pte)    # NEED UPDATE PTE CACHE
+                self.pte_cache[self._cpu.csr._satp_asid][addr & 0xFFFFF000] = (pte, pte_addr, superpage)
+            pa_key = (int(pte)&0xFFFFFC00, superpage, addr)
+            paddr = self.pa_cache.get(pa_key)
+            if not paddr:
+                va = MMU.VA(addr)
+                pa = MMU.PA(0)
+                pa.OFFSET = va.OFFSET
+                pa.PPN0 = va.VPN0 if superpage else pte.PPN0
+                pa.PPN1 = pte.PPN1
+                paddr = int(pa)
+                if len(self.pa_cache) > 524288:
+                    self.pa_cache.clear()
+                    # print("{} clear pa_cache".format(datetime.datetime.now()))
+                self.pa_cache[pa_key] = paddr
         else:
             paddr = addr
         if write:
             self._cpu.inst_cache[paddr>>12].clear()
         return paddr
 
+    def translate_addr_accel(self, tag, addr, write=False, fetch_inst=False):
+        prev_addr, prev_paddr = self.accel_cache.get(tag, (None, None))
+        if prev_addr and addr^prev_addr < 0xFFF:
+            return prev_paddr + addr - prev_addr
+        paddr = self.translate_addr(addr, write, fetch_inst)
+        self.accel_cache[tag] = (addr, paddr)
+        return paddr
+
     def read(self, addr, length):
-        start_offset = addr&0xfff
-        end_offset = (addr+length-1)&0xfff
-        if end_offset < start_offset:   # should not happen
-            logger.error("read addr {} length {} across page".format(addr, length))
-        return self._addrspace.read(self.translate_addr(addr), length)
+        # start_offset = addr&0xfff
+        # end_offset = (addr+length-1)&0xfff
+        # if end_offset < start_offset:   # should not happen
+        #     logger.error("read addr {} length {} across page".format(addr, length))
+
+        return self._addrspace.read(self.translate_addr_accel(0, addr), length)
 
     def write(self, addr, data):
-        length = len(data)
-        start_offset = addr&0xfff
-        end_offset = (addr+length-1)&0xfff
-        if end_offset < start_offset:
-            logger.error("write addr {} length {} across page".format(addr, length))
-        self._addrspace.write(self.translate_addr(addr, write=True), data)
+        # length = len(data)
+        # start_offset = addr&0xfff
+        # end_offset = (addr+length-1)&0xfff
+        # if end_offset < start_offset:
+        #     logger.error("write addr {} length {} across page".format(addr, length))
+
+        self._addrspace.write(self.translate_addr_accel(1, addr, write=True), data)
+

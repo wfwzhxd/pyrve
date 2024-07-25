@@ -1,14 +1,12 @@
 from typing import Any
 import functools
 
-bitcut = lambda v,l,h:((v&(2<<h)-1))>>l
+WV = [(2<<w)-1 for w in range(32)]
+
+bitcut = lambda v,l,h:(v>>l)&WV[h-l]
 
 def bitput(v, l, h, nv):
-    up = bitcut(v, h+1, int.bit_length(v)+ 1)<<(h+1)
-    mid = nv << l
-    down = bitcut(v, 0, l-1) if l else 0
-    # print("{} {} {}".format(bin(up), bin(mid), bin(down)))
-    return up | mid | down
+    return v & ~(WV[h-l]<<l) |nv<<l
 
 def get_bit(value, bit):
     return 1 if bool(value & (1<<bit)) else 0
@@ -128,15 +126,13 @@ class NamedArray:
         self._inner_array[key] = value
 
     def __getattr__(self, name):
-        if name in self._index_map:
-            return self._inner_array[self._index_map[name]]
-        raise AttributeError(name)
+        return self._inner_array[self._index_map[name]]
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name in ('_inner_array', '_index_map'):
             super().__setattr__(name, value)
         elif name in self._index_map:
-            self[self._index_map[name]] = value
+            self._inner_array[self._index_map[name]] = value
         else:
             super().__setattr__(name, value)
     

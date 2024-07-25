@@ -1,11 +1,14 @@
-import functools
 from . import util
 import logging
 
 logger = logging.getLogger(__name__)
 
-@functools.lru_cache(maxsize=2048*10)
+inst_cache = dict()
+
 def decode(inst_value):
+    r = inst_cache.get(inst_value)
+    if r:
+        return r
     from . import inst
     t = inst.InstFormat(inst_value)
     inst_class = None
@@ -197,4 +200,6 @@ def decode(inst_value):
         pass
     if not inst_class:
         raise RuntimeError("Undecode inst({})".format(hex(inst_value)))
-    return inst_class(inst_value)
+    r = inst_class(inst_value)
+    inst_cache[inst_value] = r
+    return r

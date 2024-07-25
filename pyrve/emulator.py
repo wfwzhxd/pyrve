@@ -29,7 +29,7 @@ class Emulator:
     def __init__(self) -> None:
         self.memory = Memory()
         self._cpu = cpu.CPU(self.memory, CLINT[0])
-        self._cpu.regs.pc = PHYMEM[0]
+        self._cpu.pc = PHYMEM[0]
         self.running = False
 
     def load_linux(self, kernel, rootfs):

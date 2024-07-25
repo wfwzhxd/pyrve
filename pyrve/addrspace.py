@@ -95,25 +95,23 @@ class BufferAddrSpace(AddrSpace):
         self.sub_space = []
 
     def read(self, addr, length):
-        if self.contain(addr):
-            for sub in self.sub_space:
-                if sub.contain(addr):
-                    return sub.read(addr, length)
-            if self.mem:
-                offset = addr - self.base
-                return self.mem[offset: offset + length]
+        for sub in self.sub_space:
+            if sub.contain(addr):
+                return sub.read(addr, length)
+        if self.mem:
+            offset = addr - self.base
+            return self.mem[offset: offset + length]
         raise InvalidAddress("{} unhandled read at {}".format(self.name, hex(addr)))
 
     def write(self, addr, data):
-        if self.contain(addr):
-            for sub in self.sub_space:
-                if sub.contain(addr):
-                    sub.write(addr, data)
-                    return
-            if self.mem:
-                offset = addr - self.base
-                self.mem[offset: offset + len(data)] = data
+        for sub in self.sub_space:
+            if sub.contain(addr):
+                sub.write(addr, data)
                 return
+        if self.mem:
+            offset = addr - self.base
+            self.mem[offset: offset + len(data)] = data
+            return
         raise InvalidAddress("{} unhandled write at {}".format(self.name, hex(addr)))
 
 
